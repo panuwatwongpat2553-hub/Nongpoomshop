@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>ผู้ดูแล · Nongpoom Shop</title>
+<style>
+:root{--bg:#05070D;--sf:#0B1020;--el:#111A2D;--bl:#0866FF;--cy:#16D9FF;--pu:#8A70FF;--tx:#F5F7FF;--t2:#A6B1C8;--ok:#22C55E;--er:#EF4444;--ln:#1d2a47}
+*{box-sizing:border-box;margin:0}body{background:var(--bg);color:var(--tx);font:400 14px/1.5 system-ui,"Prompt",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}
+.wrap{max-width:1100px;margin:0 auto;padding:12px 16px 60px}
+.top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--ln);margin-bottom:12px}
+.btn{padding:8px 14px;border-radius:10px;border:1px solid var(--ln);background:var(--el)}.btn:hover{border-color:var(--cy)}
+.pri{background:linear-gradient(135deg,var(--bl),var(--pu));border:0}.ok{background:var(--ok);color:#04130a;border:0}.no{background:var(--er);border:0}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs .on{background:var(--bl);border-color:var(--bl)}
+input,select,textarea{background:var(--el);border:1px solid var(--ln);border-radius:10px;padding:8px 10px;max-width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}.grow{flex:1}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:12px;margin-bottom:8px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.stats div{background:var(--sf);border:1px solid var(--ln);border-radius:12px;padding:12px}.stats b{display:block;font-size:22px}
+small,.mut{color:var(--t2)}table{width:100%;border-collapse:collapse}td,th{padding:6px 8px;border-bottom:1px solid var(--ln);text-align:left;vertical-align:top}
+#login{max-width:340px;margin:12vh auto;display:grid;gap:10px}
+.sl{max-width:100%;max-height:60vh;border-radius:10px;margin-top:6px}
+.st-pending{color:#facc15}.st-approved{color:var(--ok)}.st-rejected{color:var(--er)}
+</style></head><body>
+<div id="login" hidden><h2>ผู้ดูแลระบบ</h2><input id="u" placeholder="ชื่อผู้ใช้" autocomplete="username"><input id="p" type="password" placeholder="รหัสผ่าน" autocomplete="current-password"><button class="btn pri" id="go">เข้าสู่ระบบ</button><small id="lerr" style="color:var(--er)"></small><a href="/" class="mut">← กลับหน้าร้าน</a></div>
+<div class="wrap" id="app" hidden>
+<div class="top"><b style="font-size:18px">ระบบผู้ดูแล · Nongpoom Shop</b><span class="grow"></span><span class="mut" id="me"></span><a class="btn" href="/">หน้าร้าน</a><button class="btn" id="out">ออกจากระบบ</button></div>
+<div class="tabs" id="tabs"></div><div id="view"></div></div>
+<script>
+const $=i=>document.getElementById(i),E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const f=n=>'฿'+Number(n).toLocaleString('th-TH'),T=t=>t?new Date(t).toLocaleString('th-TH',{timeZone:'Asia/Bangkok'}):'-';
+let tok=localStorage.getItem('np_token')||'',tab='sum',edit=null,data={};
+async function api(path,method='GET',body){
+  const h={};if(tok)h.Authorization='Bearer '+tok;if(body!==undefined)h['Content-Type']='application/json';
+  const r=await fetch(path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({error:'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง'}));if(!r.ok)throw new Error(d.error||'ไม่สำเร็จ');return d}
+const say=m=>alert(m);
+const TABS=[['sum','สรุป'],['top','เติมเงิน'],['prod','สินค้า'],['mem','สมาชิก'],['ord','ออเดอร์'],['cpn','คูปอง'],['tix','แจ้งปัญหา']];
+async function boot(){
+  try{const me=await api('/api/me');if(me.role!=='admin')throw new Error();$('me').textContent=me.username;$('login').hidden=true;$('app').hidden=false;show(tab)}
+  catch(e){$('app').hidden=true;$('login').hidden=false}}
+$('go').onclick=async()=>{try{const d=await api('/api/login','POST',{username:$('u').value.trim(),password:$('p').value});if(d.user.role!=='admin'){$('lerr').textContent='บัญชีนี้ไม่ใช่ผู้ดูแล';return}tok=d.token;localStorage.setItem('np_token',tok);$('p').value='';boot()}catch(e){$('lerr').textContent=e.message}};
+$('out').onclick=()=>{localStorage.removeItem('np_token');tok='';boot()};
+function show(t){tab=t;$('tabs').innerHTML=TABS.map(([k,n])=>`<button class="btn ${k===t?'on':''}" onclick="show('${k}')">${n}</button>`).join('');R[t]().catch(e=>{$('view').innerHTML='<div class="card" style="color:var(--er)">'+E(e.message)+'</div>'})}
+const act=async(fn)=>{try{await fn();show(tab)}catch(e){say(e.message)}};
+const R={
+async sum(){const s=await api('/api/admin/stats');$('view').innerHTML=`<div class="stats">${[['ยอดขายรวม',f(s.sales)],['ออเดอร์',s.orders],['สมาชิก',s.members],['เครดิตคงค้างทั้งหมด',f(s.credit_total)],['ไอดีพร้อมขาย',s.products_ready],['ขายแล้ว',s.products_sold],['เติมเงินรอตรวจ',s.topups_pending],['เรื่องรอตอบ',s.tickets_open]].map(([a,b])=>`<div><small>${a}</small><b>${b}</b></div>`).join('')}</div>`},
+async top(){const l=await api('/api/admin/topups');data.top=l;$('view').innerHTML='<div class="card mut">⚠️ อนุมัติเมื่อเห็นยอดเงินเข้าบัญชีจริงตรงกับจำนวนและเวลาเท่านั้น ห้ามอนุมัติจากรูปสลิปอย่างเดียว</div>'+(l.length?l.map(t=>`<div class="card"><div class="row"><b>${E(t.username)}</b><span>${f(t.amount)}</span><span class="mut">${t.method==='kbank'?'กสิกร':'TrueMoney'}</span><small>${E(t.ref)} · ${T(t.created)}</small><span class="grow"></span><b class="st-${t.status}">${t.status==='pending'?'รอตรวจสอบ':t.status==='approved'?'อนุมัติแล้ว':'ปฏิเสธแล้ว'}</b></div><div class="row">${t.has_slip?`<button class="btn" onclick="slip(${t.id})">ดูสลิป</button>`:'<small>ยังไม่แนบสลิป</small>'}${t.status==='pending'?`<button class="btn ok" onclick="decide(${t.id},'approve')">อนุมัติ</button><button class="btn no" onclick="decide(${t.id},'reject')">ปฏิเสธ</button>`:''}</div><div id="sl${t.id}"></div></div>`).join(''):'<div class="card mut">ยังไม่มีรายการ</div>')},
+async prod(){const l=await api('/api/admin/products');data.prod=l;const x=edit?l.find(p=>p.id===edit):null;
+$('view').innerHTML=`<div class="card"><b>${x?'แก้ไขสินค้า #'+x.id:'เพิ่มสินค้า'}</b><div class="row"><input id="pn" class="grow" placeholder="ชื่อสินค้า" value="${E(x?.name||'')}"><input id="pp" type="number" min="1" placeholder="ราคา" style="width:110px" value="${x?.price||''}"></div>
+<div class="row"><input id="pt" class="grow" placeholder="แท็ก คั่นด้วย ," value="${E((x?.tags||[]).join(', '))}"></div><div class="row"><textarea id="pd" class="grow" rows="2" placeholder="รายละเอียด (ลูกค้าเห็น)">${E(x?.descr||'')}</textarea></div>
+<div class="row"><textarea id="pc" class="grow" rows="3" placeholder="ข้อมูลล็อกอินไอดี (ลูกค้าเห็นหลังซื้อเท่านั้น)">${E(x?.cred||'')}</textarea></div>
+<div class="row"><input id="pi" type="file" accept="image/*" multiple><small>${x?`มีรูปอยู่ ${x.imgs.length} รูป (เลือกไฟล์ใหม่เพื่อเพิ่ม สูงสุด 8)`:'สูงสุด 8 รูป'}</small></div>
+<div class="row"><button class="btn pri" onclick="saveP()">${x?'บันทึก':'เพิ่มสินค้า'}</button>${x?'<button class="btn" onclick="edit=null;show(\'prod\')">ยกเลิก</button>':''}</div></div>`
++l.map(p=>`<div class="card"><div class="row"><b>#${p.id} ${E(p.name)}</b><span>${f(p.price)}</span><span class="${p.sold?'st-rejected':'st-approved'}">${p.sold?'ขายแล้ว':'พร้อมขาย'}</span><span class="grow"></span><button class="btn" onclick="edit=${p.id};show('prod')">แก้ไข</button><button class="btn" onclick="toggleSold(${p.id})">${p.sold?'ตั้งเป็นพร้อมขาย':'ตั้งเป็นขายแล้ว'}</button><button class="btn no" onclick="delP(${p.id})">ลบ</button></div><small class="mut">${E(p.cred||'(ยังไม่มีข้อมูลไอดี)')}</small></div>`).join('')},
+async mem(){const l=await api('/api/admin/members');data.mem=l;$('view').innerHTML='<div class="card"><table><tr><th>ผู้ใช้</th><th>เบอร์</th><th>เครดิต</th><th>ล่าสุด</th><th></th></tr>'+l.map(m=>`<tr><td>${E(m.username)}</td><td>${E(m.phone||'-')}</td><td>${f(m.balance)}</td><td>${T(m.last_seen)}</td><td><button class="btn" onclick="adjust(${m.id})">ปรับเครดิต</button> <button class="btn" onclick="ledger(${m.id})">ประวัติ</button></td></tr>`).join('')+'</table><div id="led"></div></div>'},
+async ord(){const l=await api('/api/admin/orders');$('view').innerHTML='<div class="card"><table><tr><th>เลขที่</th><th>ผู้ซื้อ</th><th>สินค้า</th><th>ราคา</th><th>ลด</th><th>ชำระ</th><th>เวลา</th></tr>'+l.map(o=>`<tr><td>${E(o.no)}</td><td>${E(o.username)}</td><td>${E(o.product)}</td><td>${f(o.price)}</td><td>${o.discount?f(o.discount)+' '+E(o.coupon||''):'-'}</td><td>${f(o.total)}</td><td>${T(o.created)}</td></tr>`).join('')+'</table></div>'},
+async cpn(){const l=await api('/api/admin/coupons');$('view').innerHTML=`<div class="card"><b>เพิ่มคูปอง</b><div class="row"><input id="kc" placeholder="รหัส A-Z0-9" style="width:130px"><select id="kt"><option value="p">เปอร์เซ็นต์</option><option value="b">บาท</option></select><input id="kv" type="number" placeholder="ส่วนลด" style="width:100px"><input id="km" type="number" placeholder="ราคาขั้นต่ำ" style="width:120px"><input id="kr" type="number" placeholder="จำนวนครั้ง" style="width:110px"><button class="btn pri" onclick="addK()">เพิ่ม</button></div><small class="mut">ลูกค้าใช้คูปองกับไอดีราคาสูงสุดในตะกร้า 1 รายการต่อครั้ง</small></div>`+l.map(c=>`<div class="card row"><b>${E(c.code)}</b><span>ลด ${c.val}${c.type==='p'?'%':' บาท'}</span><span class="mut">ขั้นต่ำ ${f(c.minspend)} · เหลือ ${c.remaining}</span><span class="grow"></span><button class="btn no" onclick="delK('${E(c.code)}')">ลบ</button></div>`).join('')},
+async tix(){const l=await api('/api/admin/tickets');$('view').innerHTML=l.length?l.map(t=>`<div class="card"><b>${E(t.subject)}</b> <small>${E(t.username)} · ${T(t.created)}</small><p>${E(t.body)}</p>${t.reply?`<div class="mut">ตอบแล้ว: ${E(t.reply)}</div>`:''}<div class="row"><input class="grow" id="rp${t.id}" placeholder="พิมพ์คำตอบ" value=""><button class="btn pri" onclick="reply(${t.id})">${t.reply?'แก้คำตอบ':'ตอบ'}</button></div></div>`).join(''):'<div class="card mut">ไม่มีเรื่องแจ้ง</div>'}
+};
+async function slip(id){const d=await api('/api/admin/topups/'+id+'/slip');const b=$('sl'+id);b.innerHTML='';if(!d.slip){b.textContent='ไม่มีสลิป';return}if(!/^data:image\/(jpeg|png|webp);base64,/.test(d.slip)){b.textContent='ไฟล์ไม่ถูกต้อง';return}const i=new Image();i.className='sl';i.src=d.slip;b.append(i)}
+function decide(id,a){const t=data.top.find(x=>x.id===id);if(a==='approve'&&!confirm(`ยืนยันว่าเห็นเงิน ${f(t.amount)} จาก ${t.username} เข้าบัญชีจริงแล้ว? เครดิตจะถูกเพิ่มทันทีและย้อนไม่ได้`))return;if(a==='reject'&&!confirm('ปฏิเสธรายการนี้?'))return;act(()=>api(`/api/admin/topups/${id}/${a}`,'POST',{}))}
+const shrink=fl=>new Promise((ok,no)=>{const rd=new FileReader();rd.onerror=no;rd.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const s=Math.min(1,960/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*s);c.height=Math.round(i.height*s);c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8))};i.src=rd.result};rd.readAsDataURL(fl)});
+async function saveP(){let im=[];try{for(const fl of [...$('pi').files].slice(0,8))im.push(await shrink(fl))}catch(e){return say('อ่านรูปไม่ได้')}
+  const old=edit?data.prod.find(p=>p.id===edit):null,b={name:$('pn').value,price:+$('pp').value,tags:$('pt').value.split(',').map(s=>s.trim()).filter(Boolean),descr:$('pd').value,cred:$('pc').value,imgs:[...(old?.imgs||[]),...im].slice(0,8),sold:old?old.sold:false};
+  act(async()=>{if(edit)await api('/api/admin/products/'+edit,'PUT',b);else await api('/api/admin/products','POST',b);edit=null})}
+function toggleSold(id){const p=data.prod.find(x=>x.id===id);act(()=>api('/api/admin/products/'+id,'PUT',{name:p.name,price:p.price,tags:p.tags,descr:p.descr,cred:p.cred,imgs:p.imgs,sold:!p.sold}))}
+function delP(id){if(confirm('ลบสินค้านี้? (ลบไม่ได้ถ้ามีประวัติการขาย)'))act(()=>api('/api/admin/products/'+id,'DELETE'))}
+function adjust(id){const u=data.mem.find(x=>x.id===id).username;const d=prompt(`ปรับเครดิตของ ${u} (ใส่ + หรือ − เป็นบาท เช่น 100 หรือ -50)`);if(d===null)return;const n=Number(d);if(!Number.isInteger(n)||!n)return say('จำนวนไม่ถูกต้อง');const r=prompt('เหตุผล (บังคับ)');if(!r)return;act(()=>api(`/api/admin/members/${id}/adjust`,'POST',{delta:n,reason:r}))}
+async function ledger(id){try{const l=await api('/api/admin/ledger/'+id);$('led').innerHTML='<table style="margin-top:10px"><tr><th>เวลา</th><th>ประเภท</th><th>จำนวน</th><th>อ้างอิง/หมายเหตุ</th></tr>'+l.map(x=>`<tr><td>${T(x.created)}</td><td>${E(x.kind)}</td><td style="color:${x.delta<0?'var(--er)':'var(--ok)'}">${x.delta}</td><td>${E(x.ref||'')} ${E(x.note||'')}</td></tr>`).join('')+'</table>'}catch(e){say(e.message)}}
+function addK(){act(()=>api('/api/admin/coupons','POST',{code:$('kc').value,type:$('kt').value,val:+$('kv').value,minspend:+$('km').value||0,remaining:+$('kr').value}))}
+function delK(c){if(confirm('ลบคูปอง '+c+'?'))act(()=>api('/api/admin/coupons/'+c,'DELETE'))}
+function reply(id){const v=$('rp'+id).value.trim();if(!v)return;act(()=>api(`/api/admin/tickets/${id}/reply`,'POST',{reply:v}))}
+boot();
+</script></body></html>
