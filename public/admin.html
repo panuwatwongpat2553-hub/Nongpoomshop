@@ -167,6 +167,7 @@ td.r,th.r{text-align:right}td.act{white-space:nowrap;text-align:right}
   .tp{grid-template-columns:auto 1fr}.tp .amt{grid-column:2}
   .ph h1{font-size:21px}
 }
+.th button.cv{top:auto;bottom:3px;right:auto;left:3px;width:auto;height:18px;border-radius:9px;padding:0 6px;font-size:10px}.sale{background:rgba(250,204,21,.12);color:#facc15}.sub{font-size:12px;color:var(--t3)}.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}.mono{font:600 15px ui-monospace,monospace;letter-spacing:.06em;word-break:break-all}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style></head><body>
 
@@ -177,6 +178,7 @@ td.r,th.r{text-align:right}td.act{white-space:nowrap;text-align:right}
     <label class="fld">ชื่อผู้ใช้<input id="u" autocomplete="username" placeholder="ชื่อผู้ใช้"></label>
     <label class="fld">รหัสผ่าน<input id="p" type="password" autocomplete="current-password" placeholder="รหัสผ่าน"></label>
     <button class="btn pri" id="go">เข้าสู่ระบบ</button>
+    <label class="fld" id="otpw" hidden>รหัส 2FA 6 หลัก<input id="otp" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="000000"></label>
     <div id="lerr"></div>
     <a href="/" class="back mut">← กลับหน้าร้าน</a>
   </div>
@@ -204,7 +206,7 @@ let ME={},tok=localStorage.getItem('np_token')||'',tab='sum',edit=null,eimgs=[],
 async function api(path,method='GET',body){
   const h={};if(tok)h.Authorization='Bearer '+tok;if(body!==undefined)h['Content-Type']='application/json';
   const r=await fetch(path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body)});
-  const d=await r.json().catch(()=>({error:'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง'}));if(!r.ok)throw new Error(d.error||'ไม่สำเร็จ');return d}
+  const d=await r.json().catch(()=>({error:'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง'}));if(!r.ok){const e=new Error(d.error||'ไม่สำเร็จ');e.data=d;throw e}return d}
 let _tt;const say=(m,good)=>{const t=$('toast');t.textContent=m;t.classList.toggle('good',!!good);t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),3200)};
 
 /* icons */
@@ -224,6 +226,8 @@ const IC={
  coin:'<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.5c0-1 1-1.5 2.5-1.5s2.5.6 2.5 1.7-1 1.4-2.5 1.8-2.5.7-2.5 1.8 1 1.7 2.5 1.7 2.5-.5 2.5-1.5"/>',
  check:'<path d="M20 6L9 17l-5-5"/>',
  img:'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>',
+ chart:'<path d="M3 3v18h18"/><path d="M7 15l4-5 3 3 5-7"/>',
+ shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
  inbox:'<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'
 };
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
@@ -232,13 +236,13 @@ $('goShop').innerHTML=ic('store')+'<span>ดูหน้าร้าน</span>';
 const NAV=[
  ['หลัก',[['sum','ภาพรวม','grid'],['top','เติมเงิน','wallet']]],
  ['จัดการร้าน',[['prod','สินค้า','box'],['ord','ออเดอร์','bag'],['cpn','คูปอง','tag']]],
- ['ลูกค้า',[['mem','สมาชิก','users'],['tix','แจ้งปัญหา','chat']]],
- ['ระบบ',[['aud','ประวัติการทำงาน','inbox']]]
+ ['ลูกค้า',[['mem','สมาชิก','users'],['tix','แจ้งปัญหา','chat'],['flg','พฤติกรรมน่าสงสัย','alert']]],
+ ['ระบบ',[['rep','รายงานกำไร','chart'],['sec','ความปลอดภัย/สำรองข้อมูล','shield'],['aud','ประวัติการทำงาน','inbox']]]
 ];
-const HEAD={sum:['ภาพรวมร้าน','สรุปยอดขายและงานที่ต้องดำเนินการวันนี้'],top:['รายการเติมเงิน','ตรวจสอบสลิปและอนุมัติเครดิตให้ลูกค้า'],prod:['สินค้า','เพิ่ม แก้ไข และจัดการไอดีที่ขาย'],ord:['ออเดอร์','ประวัติการสั่งซื้อทั้งหมด'],cpn:['คูปองส่วนลด','สร้างและจัดการรหัสส่วนลด'],mem:['สมาชิก','ดูข้อมูลลูกค้า รีเซ็ตรหัสผ่าน ปรับเครดิต และตั้งผู้ดูแล'],aud:['ประวัติการทำงานของผู้ดูแล','ใครทำอะไรกับสมาชิกและเครดิต ย้อนหลังตรวจสอบได้'],tix:['แจ้งปัญหา','ตอบเรื่องที่ลูกค้าแจ้งเข้ามา']};
+const HEAD={rep:['รายงานกำไร','ยอดขาย ต้นทุน กำไร รายวัน/รายเดือน และส่งออก CSV สำหรับทำบัญชี'],flg:['พฤติกรรมน่าสงสัย','ระบบแจ้งเตือนเท่านั้น ไม่บล็อกลูกค้า ให้แอดมินตรวจและตัดสินใจเอง'],sec:['ความปลอดภัยและสำรองข้อมูล','ยืนยันตัวตนสองชั้น (2FA) และไฟล์สำรองฐานข้อมูล'],sum:['ภาพรวมร้าน','สรุปยอดขายและงานที่ต้องดำเนินการวันนี้'],top:['รายการเติมเงิน','ตรวจสอบสลิปและอนุมัติเครดิตให้ลูกค้า'],prod:['สินค้า','เพิ่ม แก้ไข และจัดการไอดีที่ขาย'],ord:['ออเดอร์','ประวัติการสั่งซื้อทั้งหมด'],cpn:['คูปองส่วนลด','สร้างและจัดการรหัสส่วนลด'],mem:['สมาชิก','ดูข้อมูลลูกค้า รีเซ็ตรหัสผ่าน ปรับเครดิต และตั้งผู้ดูแล'],aud:['ประวัติการทำงานของผู้ดูแล','ใครทำอะไรกับสมาชิกและเครดิต ย้อนหลังตรวจสอบได้'],tix:['แจ้งปัญหา','ตอบเรื่องที่ลูกค้าแจ้งเข้ามา']};
 function nav(){
   $('nav').innerHTML=NAV.map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,n,i])=>{
-    const b=k==='top'?cnt.topups_pending:k==='tix'?cnt.tickets_open:0;
+    const b=k==='top'?cnt.topups_pending:k==='tix'?cnt.tickets_open:k==='flg'?cnt.flags_open:0;
     return `<button class="nav ${k===tab?'on':''}" onclick="show('${k}')">${ic(i)}<span>${n}</span>${b?`<span class="bd">${b}</span>`:''}</button>`}).join('')).join('')}
 function head(extra=''){const[h,s]=HEAD[tab];$('ph').innerHTML=`<div><h1>${h}</h1><p>${s}</p></div><span class="grow"></span>${extra}`}
 const empty=(t,i='inbox')=>`<div class="empty">${ic(i)}<div>${t}</div></div>`;
@@ -248,8 +252,8 @@ async function counts(){try{cnt=await api('/api/admin/stats');nav()}catch(e){}}
 async function boot(){
   try{const me=await api('/api/me');if(me.role!=='admin')throw new Error();ME=me;$('me').textContent=me.username;$('whoRole').textContent=me.owner?'เจ้าของร้าน':'ผู้ดูแลระบบ';$('mav').textContent=(me.username||'A')[0].toUpperCase();$('login').hidden=true;$('app').hidden=false;show(tab)}
   catch(e){$("app").hidden=true;$("login").hidden=false}}
-$('go').onclick=async()=>{$('lerr').textContent='';try{const d=await api('/api/login','POST',{username:$('u').value.trim(),password:$('p').value});if(d.user.role!=='admin'){$('lerr').textContent='บัญชีนี้ไม่ใช่ผู้ดูแล';return}tok=d.token;localStorage.setItem('np_token',tok);$('p').value='';boot()}catch(e){$('lerr').textContent=e.message}};
-$('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+$('go').onclick=async()=>{$('lerr').textContent='';try{const body={username:$('u').value.trim(),password:$('p').value};if(!$('otpw').hidden)body.otp=$('otp').value;const d=await api('/api/login','POST',body);if(d.user.role!=='admin'){$('lerr').textContent='บัญชีนี้ไม่ใช่ผู้ดูแล';return}tok=d.token;localStorage.setItem('np_token',tok);$('p').value='';$('otp').value='';$('otpw').hidden=true;boot()}catch(e){if(e.data&&e.data.need_otp){$('otpw').hidden=false;$('otp').focus()}$('lerr').textContent=e.message}};
+$('p').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});$('otp').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
 $('out').onclick=()=>{localStorage.removeItem('np_token');tok='';boot()};
 function show(t){tab=t;nav();head();$('view').innerHTML='<div class="empty">กำลังโหลด…</div>';R[t]().catch(e=>{$('view').innerHTML='<div class="alert">'+ic('alert')+'<div>'+E(e.message)+'</div></div>'});counts()}
 const act=async(fn,ok)=>{try{await fn();if(ok)say(ok,true);show(tab)}catch(e){say(e.message)}};
@@ -263,11 +267,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMd()});
 const stTop={pending:['รอตรวจสอบ','p-wa'],approved:['อนุมัติแล้ว','p-ok'],rejected:['ปฏิเสธแล้ว','p-er']};
 const R={
 async sum(){const s=await api('/api/admin/stats');
-  const K=[['ยอดขายรวม',f(s.sales),'money','c-ok'],['ออเดอร์',s.orders,'bag','c-bl'],['สมาชิก',s.members,'users','c-pu'],['เครดิตคงค้างทั้งหมด',f(s.credit_total),'coin','c-cy'],['ไอดีพร้อมขาย',s.products_ready,'box','c-ok'],['ขายแล้ว',s.products_sold,'check','c-wa']];
+  const K=[['ยอดขายรวม',f(s.sales),'money','c-ok'],['ออเดอร์',s.orders,'bag','c-bl'],['สมาชิก',s.members,'users','c-pu'],['เครดิตคงค้างทั้งหมด',f(s.credit_total),'coin','c-cy'],['ไอดีพร้อมขาย',s.products_ready,'box','c-ok'],['ขายแล้ว',s.products_sold,'check','c-wa'],['กำไรรวม',f(s.profit),'chart','c-ok']];
   $('view').innerHTML=`<h3 class="mut" style="font-size:13px;font-weight:500;margin-bottom:10px">งานที่ต้องดำเนินการ</h3>
   <div class="todo" style="margin-bottom:24px">
    <button class="t" onclick="data.topF='pending';show('top')"><span class="ib c-wa">${ic('wallet')}</span><div><b>เติมเงินรอตรวจ</b><small>กดเพื่อไปตรวจสลิป</small></div><span class="n" style="color:${s.topups_pending?'var(--wa)':'var(--t3)'}">${s.topups_pending}</span></button>
    <button class="t" onclick="show('tix')"><span class="ib c-er">${ic('chat')}</span><div><b>เรื่องรอตอบ</b><small>ลูกค้าแจ้งปัญหาเข้ามา</small></div><span class="n" style="color:${s.tickets_open?'#ff8a8a':'var(--t3)'}">${s.tickets_open}</span></button>
+   <button class="t" onclick="show('flg')"><span class="ib c-er">${ic('alert')}</span><div><b>เรื่องน่าสงสัย</b><small>ระบบตรวจพบพฤติกรรมผิดปกติ</small></div><span class="n" style="color:${s.flags_open?'#ff8a8a':'var(--t3)'}">${s.flags_open}</span></button>
   </div>
   <h3 class="mut" style="font-size:13px;font-weight:500;margin-bottom:10px">ภาพรวม</h3>
   <div class="kpis">${K.map(([a,b,i,c])=>`<div class="kpi"><div class="ico ${c}">${ic(i)}</div><div><small>${a}</small><b>${b}</b></div></div>`).join('')}</div>
@@ -299,7 +304,30 @@ async cpn(){const l=await api('/api/admin/coupons');
   <h3 class="mut" style="font-size:13px;font-weight:500;margin-bottom:10px">คูปองทั้งหมด (${l.length})</h3>`+
   (l.length?l.map(c=>`<div class="card cp"><span class="code">${E(c.code)}</span><div><div class="v">ลด ${c.val}${c.type==='p'?'%':' บาท'}</div><small class="mut">ขั้นต่ำ ${f(c.minspend)}</small></div><span class="pill ${c.remaining>0?'p-bl':'p-mu'}">เหลือ ${c.remaining} ครั้ง</span><span class="grow"></span><button class="btn sm no" onclick="delK('${E(c.code)}')">ลบ</button></div>`).join(''):empty('ยังไม่มีคูปอง','tag'))},
 
-async aud(){const l=await api('/api/admin/audit'),A={adjust_credit:'ปรับเครดิต',reset_password:'รีเซ็ตรหัสผ่าน',make_admin:'ตั้งเป็นผู้ดูแล',remove_admin:'ถอดสิทธิ์ผู้ดูแล',topup_approved:'อนุมัติเติมเงิน',topup_rejected:'ปฏิเสธเติมเงิน'};
+async rep(){
+  const th=Date.now()+7*36e5,d0=new Date(th).toISOString().slice(0,10),d1=new Date(th-29*864e5).toISOString().slice(0,10);
+  data.rf=data.rf||d1;data.rt=data.rt||d0;data.rby=data.rby||'day';
+  $('view').innerHTML=`<div class="bar"><label class="fld" style="flex:0 0 auto">จาก<input id="rf" type="date" value="${data.rf}"></label><label class="fld" style="flex:0 0 auto">ถึง<input id="rt" type="date" value="${data.rt}"></label>
+   <label class="fld" style="flex:0 0 auto">แยกตาม<select id="rby"><option value="day"${data.rby==='day'?' selected':''}>รายวัน</option><option value="month"${data.rby==='month'?' selected':''}>รายเดือน</option></select></label>
+   <span class="grow"></span><button class="btn pri" onclick="repLoad()">แสดงรายงาน</button><button class="btn" onclick="repCsv('report')">${ic('inbox')}CSV สรุป</button><button class="btn" onclick="repCsv('orders')">${ic('inbox')}CSV ออเดอร์</button></div><div id="rbody"></div>`;
+  await repLoad()},
+async flg(){const l=await api('/api/admin/flags');
+  $('view').innerHTML=l.length?l.map(x=>`<div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="pill p-wa">${E(x.label)}</span><b>${E(x.username)}</b><span class="grow"></span><small class="mut">${T(x.created)}</small></div><div class="mut" style="margin:8px 0">${E(x.detail||'')}</div><div class="acts"><button class="btn sm" onclick="info(${x.user_id},true)">ดูข้อมูลสมาชิก</button><span class="grow"></span><button class="btn sm ok" onclick="resolveFlag(${x.id})">${ic('check')}ปิดเรื่อง</button></div></div>`).join(''):empty('ไม่มีเรื่องน่าสงสัย 🎉','check')},
+async sec(){
+  const t=await api('/api/admin/2fa');let h='';
+  h+=`<div class="card" style="margin-bottom:18px"><h3>ยืนยันตัวตนสองชั้น (2FA)</h3>`;
+  if(t.on)h+=`<div class="alert" style="border-color:var(--ok)">${ic('check')}<div>บัญชีนี้ป้องกันด้วย 2FA แล้ว ต้องใช้รหัส 6 หลักจากแอป Authenticator ทุกครั้งที่เข้าสู่ระบบ</div></div>
+   <div class="fg" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:12px"><label class="fld">รหัสผ่าน<input id="dpw" type="password" autocomplete="current-password"></label><label class="fld">รหัส 2FA ปัจจุบัน<input id="dcode" inputmode="numeric" maxlength="7"></label></div>
+   <div class="bar" style="margin:12px 0 0"><span class="grow"></span><button class="btn no" onclick="tfOff()">ปิด 2FA</button></div>`;
+  else h+=`<div class="alert">${ic('alert')}<div>บัญชีแอดมินอนุมัติเงินและเห็นข้อมูลไอดีทั้งหมด แนะนำให้เปิด 2FA${t.required?' (ร้านนี้บังคับ)':''} ใช้ได้กับ Google Authenticator, Authy ฯลฯ</div></div><div id="tfbox" style="margin-top:12px"><button class="btn pri" onclick="tfSetup()">เปิดใช้ 2FA</button></div>`;
+  h+='</div>';
+  if(ME.owner){const b=await api('/api/admin/backups');
+    h+=`<div class="card"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h3 style="margin:0">สำรองข้อมูล</h3><span class="grow"></span><button class="btn pri" onclick="bkNow()">สำรองตอนนี้</button></div>
+     <p class="mut" style="margin:8px 0 14px;font-size:13px">ระบบสำรองฐานข้อมูลอัตโนมัติทุก ${b.every_hours} ชม. เก็บล่าสุด ${b.keep} ไฟล์ ไฟล์สำรองมีข้อมูลไอดีและสลิปทั้งหมด เก็บให้ปลอดภัย (เห็นเฉพาะเจ้าของร้าน)</p>
+     ${b.items.length?`<div class="tw"><table><thead><tr><th>ไฟล์</th><th>เวลา</th><th class="r">ขนาด</th><th></th></tr></thead><tbody>${b.items.map(x=>`<tr><td>${E(x.name)}</td><td class="mut">${T(x.created)}</td><td class="r">${(x.size/1048576).toFixed(2)} MB</td><td class="act"><button class="btn sm" onclick="dlFile('/api/admin/backups/download?name=${encodeURIComponent(x.name)}','${E(x.name)}')">ดาวน์โหลด</button></td></tr>`).join('')}</tbody></table></div>`:empty('ยังไม่มีไฟล์สำรอง')}</div>`}
+  else h+=`<div class="alert">${ic('alert')}<div>การสำรองข้อมูลดูและดาวน์โหลดได้เฉพาะเจ้าของร้าน</div></div>`;
+  $('view').innerHTML=h},
+async aud(){const l=await api('/api/admin/audit'),A={adjust_credit:'ปรับเครดิต',reset_password:'รีเซ็ตรหัสผ่าน',make_admin:'ตั้งเป็นผู้ดูแล',remove_admin:'ถอดสิทธิ์ผู้ดูแล',topup_approved:'อนุมัติเติมเงิน',topup_rejected:'ปฏิเสธเติมเงิน',resolve_flag:'ปิดเรื่องน่าสงสัย',make_backup:'สำรองข้อมูล',download_backup:'ดาวน์โหลดไฟล์สำรอง','2fa_enable':'เปิด 2FA','2fa_disable':'ปิด 2FA','2fa_reset':'รีเซ็ต 2FA ให้ผู้ดูแล'};
   $('view').innerHTML=l.length?`<div class="tw"><table><thead><tr><th>เวลา</th><th>ผู้ดูแล</th><th>การกระทำ</th><th>สมาชิก</th><th>รายละเอียด</th></tr></thead><tbody>`+l.map(x=>`<tr><td class="mut">${T(x.created)}</td><td><b>${E(x.admin_name)}</b></td><td>${E(A[x.action]||x.action)}</td><td>${E(x.target_name||'-')}</td><td class="mut">${E(x.detail||'')}</td></tr>`).join('')+'</tbody></table></div>':empty('ยังไม่มีบันทึก')},
 
 async tix(){const l=await api('/api/admin/tickets');
@@ -346,31 +374,38 @@ function prodList(){
   const F=data.prodF,Q=data.prodQ.trim().toLowerCase(),l=data.prod,n=k=>k==='all'?l.length:l.filter(p=>k==='sold'?p.sold:!p.sold).length;
   $('pseg').innerHTML=[['all','ทั้งหมด'],['ready','พร้อมขาย'],['sold','ขายแล้ว']].map(([k,t])=>`<button class="${k===F?'on':''}" onclick="data.prodF='${k}';prodList()">${t}<i>${n(k)}</i></button>`).join('');
   const v=l.filter(p=>(F==='all'||(F==='sold')===!!p.sold)&&(!Q||(p.name+' '+(p.tags||[]).join(' ')+' #'+p.id).toLowerCase().includes(Q)));
-  $('plist').innerHTML=v.length?'<div class="pg">'+v.map(p=>`<div class="pc ${p.sold?'sold':''}"><div class="im">${p.imgs&&p.imgs[0]?`<img src="${E(p.imgs[0])}" alt="" loading="lazy">`:ic('img')}<span class="pill ${p.sold?'p-er':'p-ok'}">${p.sold?'ขายแล้ว':'พร้อมขาย'}</span>${p.imgs&&p.imgs.length>1?`<span class="cnt">${p.imgs.length} รูป</span>`:''}</div>
-   <div class="bd"><div><small class="t3">#${p.id}</small><h4>${E(p.name)}</h4></div><div class="pr">${f(p.price)}</div>${(p.tags||[]).length?`<div class="tags">${p.tags.map(x=>`<span>${E(x)}</span>`).join('')}</div>`:''}
+  $('plist').innerHTML=v.length?'<div class="pg">'+v.map(p=>`<div class="pc ${p.sold?'sold':''}"><div class="im">${p.imgs&&p.imgs[0]?`<img src="${E(p.imgs[0])}" alt="" loading="lazy">`:ic('img')}<span class="pill ${p.sold?'p-er':'p-ok'}">${p.sold?'ขายแล้ว':'พร้อมขาย'}</span>${p.img_count>1?`<span class="cnt">${p.img_count} รูป</span>`:''}</div>
+   <div class="bd"><div><small class="t3">#${p.id}</small><h4>${E(p.name)}</h4></div><div class="pr">${p.sale_active?`<s class="t3" style="font-size:13px">${f(p.price)}</s> ${f(p.sale_price)} <span class="pill sale">โปร</span>`:f(p.price)}</div>${p.cost?`<div class="sub">ต้นทุน ${f(p.cost)} · กำไร ${f((p.sale_active?p.sale_price:p.price)-p.cost)}</div>`:'<div class="sub">ยังไม่ใส่ต้นทุน</div>'}${p.sale_active?`<div class="sub">โปรถึง ${T(p.sale_end)}</div>`:''}${(p.tags||[]).length?`<div class="tags">${p.tags.map(x=>`<span>${E(x)}</span>`).join('')}</div>`:''}
    <details><summary>🔒 ข้อมูลล็อกอินไอดี</summary><pre>${E(p.cred||'(ยังไม่มีข้อมูลไอดี)')}</pre></details>
    <div class="ft"><button class="btn sm" onclick="openP(${p.id})">แก้ไข</button><button class="btn sm" onclick="toggleSold(${p.id})">${p.sold?'ตั้งเป็นพร้อมขาย':'ตั้งเป็นขายแล้ว'}</button><button class="btn sm no" onclick="delP(${p.id})" aria-label="ลบ">ลบ</button></div></div></div>`).join('')+'</div>':empty('ไม่พบสินค้า','box')}
-function openP(id){
-  edit=id;const x=id?data.prod.find(p=>p.id===id):null;eimgs=[...(x?.imgs||[])];
+async function openP(id){
+  edit=id;let x=null;if(id){try{x=await api('/api/admin/products/'+id)}catch(e){return say(e.message)}}eimgs=[...(x?.imgs||[])];
+  const dtl=ms=>ms?new Date(ms-new Date().getTimezoneOffset()*6e4).toISOString().slice(0,16):'';
   openMd(x?'แก้ไขสินค้า #'+x.id:'เพิ่มสินค้าใหม่',`<div class="fg">
    <label class="fld full">ชื่อสินค้า<input id="pn" placeholder="เช่น ไอดี Free Fire เลเวล 70" value="${E(x?.name||'')}"></label>
    <label class="fld">ราคา (บาท)<input id="pp" type="number" min="1" placeholder="0" value="${x?.price||''}"></label>
+   <label class="fld">ต้นทุนไอดี (บาท) <small class="t3">ไม่บังคับ ใช้คิดกำไร</small><input id="pco" type="number" min="0" placeholder="0" value="${x?.cost||''}"></label>
+   <label class="fld">ราคาโปรโมชัน (บาท) <small class="t3">เว้นว่าง = ไม่มีโปร</small><input id="psp" type="number" min="1" placeholder="ต่ำกว่าราคาปกติ" value="${x?.sale_price||''}"></label>
+   <label class="fld">โปรสิ้นสุดเมื่อ<input id="pse" type="datetime-local" value="${dtl(x?.sale_end)}"></label>
    <label class="fld">แท็ก (คั่นด้วย ,)<input id="pt" placeholder="ปืน EVO, เลเวล 70" value="${E((x?.tags||[]).join(', '))}"></label>
    <label class="fld full"><span>รายละเอียด <small class="t3">(ลูกค้าเห็น)</small></span><textarea id="pd" rows="2" placeholder="รายละเอียดสินค้า">${E(x?.descr||'')}</textarea></label>
    <label class="fld full"><span>ข้อมูลล็อกอินไอดี <small class="t3">(ลูกค้าเห็นหลังซื้อเท่านั้น)</small></span><textarea id="pc" rows="3" placeholder="ชื่อผู้ใช้ / รหัสผ่าน / อีเมลกู้คืน">${E(x?.cred||'')}</textarea></label>
-   <div class="fld full"><span>รูปสินค้า <small class="t3">(สูงสุด 8 รูป)</small></span><div class="ths" id="ths"></div><input id="pi" type="file" accept="image/*" multiple onchange="imgSel()"><small class="t3" id="pis"></small></div></div>`,
+   <div class="fld full"><span>รูปสินค้า <small class="t3">(สูงสุด 70 รูป)</small></span><div class="ths" id="ths"></div><input id="pi" type="file" accept="image/*" multiple onchange="imgSel()"><small class="t3" id="pis"></small></div></div>`,
    `<button class="btn" onclick="closeMd()">ยกเลิก</button><button class="btn pri" id="sv" onclick="saveP()">${x?'บันทึกการแก้ไข':'เพิ่มสินค้า'}</button>`);
   thumbs()}
-function thumbs(){$('ths').innerHTML=eimgs.map((s,i)=>`<div class="th"><img src="${E(s)}" alt=""><button onclick="rmImg(${i})" aria-label="ลบรูป">×</button></div>`).join('')}
+function thumbs(){$('ths').innerHTML=eimgs.map((s,i)=>`<div class="th"><img src="${E(s)}" alt="">${i>0?`<button class="cv" title="ตั้งเป็นรูปปก" onclick="cover(${i})">ปก</button>`:''}<button onclick="rmImg(${i})" aria-label="ลบรูป">×</button></div>`).join('')}
+function cover(i){const [x]=eimgs.splice(i,1);eimgs.unshift(x);thumbs()}
 function rmImg(i){eimgs.splice(i,1);thumbs();imgSel()}
-function imgSel(){const n=$('pi').files.length;$('pis').textContent=(n?`เลือกไฟล์ใหม่ ${n} รูป · `:'')+`รวมหลังบันทึกไม่เกิน 8 รูป (เดิม ${eimgs.length})`}
-const shrink=fl=>new Promise((ok,no)=>{const rd=new FileReader();rd.onerror=no;rd.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const s=Math.min(1,960/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*s);c.height=Math.round(i.height*s);c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8))};i.src=rd.result};rd.readAsDataURL(fl)});
+function imgSel(){const n=$('pi').files.length;$('pis').textContent=(n?`เลือกไฟล์ใหม่ ${n} รูป · `:'')+`รวมหลังบันทึกไม่เกิน 70 รูป (เดิม ${eimgs.length})`}
+const shrink=fl=>new Promise((ok,no)=>{const rd=new FileReader();rd.onerror=no;rd.onload=()=>{const i=new Image();i.onerror=no;i.onload=()=>{const s=Math.min(1,900/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*s);c.height=Math.round(i.height*s);c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.75))};i.src=rd.result};rd.readAsDataURL(fl)});
 async function saveP(){
   const btn=$('sv');btn.disabled=true;let im=[];
-  try{for(const fl of [...$('pi').files].slice(0,8))im.push(await shrink(fl))}catch(e){btn.disabled=false;return say('อ่านรูปไม่ได้')}
-  const old=edit?data.prod.find(p=>p.id===edit):null,b={name:$('pn').value,price:+$('pp').value,tags:$('pt').value.split(',').map(s=>s.trim()).filter(Boolean),descr:$('pd').value,cred:$('pc').value,imgs:[...eimgs,...im].slice(0,8),sold:old?old.sold:false};
+  try{for(const fl of [...$('pi').files].slice(0,70))im.push(await shrink(fl))}catch(e){btn.disabled=false;return say('อ่านรูปไม่ได้')}
+  const old=edit?data.prod.find(p=>p.id===edit):null,sp=$('psp').value,se=$('pse').value?Date.parse($('pse').value):null;
+  if(sp&&!se){btn.disabled=false;return say('ใส่เวลาสิ้นสุดของโปรโมชัน')}
+  const b={name:$('pn').value,price:+$('pp').value,cost:+$('pco').value||0,sale_price:sp?+sp:null,sale_end:sp?se:null,tags:$('pt').value.split(',').map(s=>s.trim()).filter(Boolean),descr:$('pd').value,cred:$('pc').value,imgs:[...eimgs,...im].slice(0,70),sold:old?old.sold:false};
   try{if(edit)await api('/api/admin/products/'+edit,'PUT',b);else await api('/api/admin/products','POST',b);closeMd();edit=null;say(old?'บันทึกการแก้ไขแล้ว':'เพิ่มสินค้าแล้ว',true);show('prod')}catch(e){btn.disabled=false;say(e.message)}}
-function toggleSold(id){const p=data.prod.find(x=>x.id===id);act(()=>api('/api/admin/products/'+id,'PUT',{name:p.name,price:p.price,tags:p.tags,descr:p.descr,cred:p.cred,imgs:p.imgs,sold:!p.sold}))}
+function toggleSold(id){const p=data.prod.find(x=>x.id===id);act(()=>api('/api/admin/products/'+id+'/sold','POST',{sold:!p.sold}))}
 function delP(id){if(confirm('ลบสินค้านี้? (ลบไม่ได้ถ้ามีประวัติการขาย)'))act(()=>api('/api/admin/products/'+id,'DELETE'),'ลบสินค้าแล้ว')}
 
 /* members */
@@ -378,10 +413,13 @@ function memList(){
   const Q=data.memQ.trim().toLowerCase(),v=data.mem.filter(m=>!Q||((m.username||'')+' '+(m.phone||'')).toLowerCase().includes(Q));
   $('mcnt').textContent=v.length+' บัญชี';
   $('mlist').innerHTML=v.length?`<div class="tw"><table><thead><tr><th>ผู้ใช้</th><th>เบอร์โทร</th><th class="r">เครดิต</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>`+v.map(m=>{const isA=m.role==='admin',canRole=ME.owner&&!m.owner&&m.id!==ME.id,canPw=!isA||ME.owner||m.id===ME.id;
-   return `<tr><td><div class="ur"><div class="av">${E((m.username||'?')[0].toUpperCase())}</div><b>${E(m.username)}</b>${m.owner?'<span class="pill p-wa">เจ้าของร้าน</span>':isA?'<span class="pill p-bl">ผู้ดูแล</span>':''}</div></td><td>${E(m.phone||'-')}</td><td class="r"><b style="color:var(--cy)">${f(m.balance)}</b></td><td class="mut">${T(m.last_seen)}</td><td class="act"><div class="acts" style="justify-content:flex-end"><button class="btn sm" onclick="info(${m.id})">ดูข้อมูล</button>${canPw?`<button class="btn sm" onclick="resetPw(${m.id})">รหัสผ่าน</button>`:''}<button class="btn sm pri" onclick="adjust(${m.id})">ปรับเครดิต</button>${canRole?`<button class="btn sm ${isA?'no':''}" onclick="setRole(${m.id},'${isA?'user':'admin'}')">${isA?'ถอดผู้ดูแล':'ตั้งเป็นผู้ดูแล'}</button>`:''}</div></td></tr>`}).join('')+'</tbody></table></div>':empty('ไม่พบสมาชิก','users')}
+   return `<tr><td><div class="ur"><div class="av">${E((m.username||'?')[0].toUpperCase())}</div><b>${E(m.username)}</b>${m.owner?'<span class="pill p-wa">เจ้าของร้าน</span>':isA?'<span class="pill p-bl">ผู้ดูแล</span>':''}${m.totp_on?'<span class="pill p-ok">2FA</span>':''}</div></td><td>${E(m.phone||'-')}</td><td class="r"><b style="color:var(--cy)">${f(m.balance)}</b></td><td class="mut">${T(m.last_seen)}</td><td class="act"><div class="acts" style="justify-content:flex-end"><button class="btn sm" onclick="info(${m.id})">ดูข้อมูล</button>${canPw?`<button class="btn sm" onclick="resetPw(${m.id})">รหัสผ่าน</button>`:''}<button class="btn sm pri" onclick="adjust(${m.id})">ปรับเครดิต</button>${ME.owner&&isA&&m.totp_on&&m.id!==ME.id?`<button class="btn sm" onclick="reset2fa(${m.id})">รีเซ็ต 2FA</button>`:''}${canRole?`<button class="btn sm ${isA?'no':''}" onclick="setRole(${m.id},'${isA?'user':'admin'}')">${isA?'ถอดผู้ดูแล':'ตั้งเป็นผู้ดูแล'}</button>`:''}</div></td></tr>`}).join('')+'</tbody></table></div>':empty('ไม่พบสมาชิก','users')}
+const FLAGL={multi_account:'หลายบัญชีจากเครือข่ายเดียวกัน',rapid_topup:'ส่งสลิปถี่ผิดปกติ',large_first_topup:'เติมเงินก้อนใหญ่ครั้งแรก',similar_topup:'ยอดเติมตรงกับสมาชิกอื่น',many_orders:'ซื้อถี่ผิดปกติ',self_referral:'แนะนำเพื่อนจากเครือข่ายเดียวกัน'};
 const stOrd={pending:'รอตรวจสอบ',approved:'อนุมัติแล้ว',rejected:'ปฏิเสธแล้ว'};
 async function info(id){try{const d=await api('/api/admin/members/'+id),m=d.member,tb=(h,rows,cols)=>rows.length?`<div class="tw" style="margin-bottom:14px"><table style="min-width:0"><thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols(r).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`:'<div class="mut" style="margin-bottom:14px">ไม่มีรายการ</div>';
   openMd('ข้อมูลสมาชิก · '+m.username,`<div class="fg" style="margin-bottom:16px"><div class="fld">ชื่อผู้ใช้<b style="color:var(--tx)">${E(m.username)}</b></div><div class="fld">รหัสผ่าน<span style="color:var(--tx)">••••••••  <small class="t3">(เก็บแบบเข้ารหัสทางเดียว ดูไม่ได้ ใช้ปุ่ม "รหัสผ่าน" เพื่อตั้งใหม่ให้ลูกค้า)</small></span></div><div class="fld">เบอร์โทร<b style="color:var(--tx)">${E(m.phone||'-')}</b></div><div class="fld">สิทธิ์<b style="color:var(--tx)">${m.owner?'เจ้าของร้าน':m.role==='admin'?'ผู้ดูแล':'สมาชิก'}</b></div><div class="fld">เครดิตคงเหลือ<b style="color:var(--cy);font-size:18px">${f(m.balance)}</b></div><div class="fld">สมัครเมื่อ / เข้าใช้ล่าสุด<span style="color:var(--tx)">${T(m.created)} / ${T(m.last_seen)}</span></div></div>
+  <div class="kv"><div class="fld">ระดับสมาชิก<b style="color:var(--tx)">${E(d.tier.name)} (ลด ${d.tier.pct}%)</b><span class="sub">ยอดซื้อสะสม ${f(d.tier.spent)}${d.tier.next?` · อีก ${f(d.tier.next.need)} ถึง ${E(d.tier.next.name)}`:''}</span></div><div class="fld">แนะนำเพื่อนแล้ว<b style="color:var(--tx)">${d.referrals} คน</b></div></div>
+  ${d.flags.length?`<h4 style="margin:6px 0 8px">เรื่องน่าสงสัย (${d.flags.length})</h4>`+d.flags.map(x=>`<div class="sub" style="margin-bottom:6px">${x.resolved?'✔':'⚠️'} ${E(FLAGL[x.kind]||x.kind)} · ${E(x.detail||'')} · ${T(x.created)}</div>`).join(''):''}
   <h4 style="margin:6px 0 8px">คำสั่งซื้อ (${d.orders.length})</h4>${tb(['เลขที่','สินค้า','ชำระ','ข้อมูลไอดีที่ส่งมอบ','เวลา'],d.orders,o=>[E(o.no),E(o.product),f(o.total),`<small style="word-break:break-all">${E(o.credentials||'')}</small>`,T(o.created)])}
   <h4 style="margin:6px 0 8px">เติมเงิน (${d.topups.length})</h4>${tb(['อ้างอิง','ช่องทาง','จำนวน','สถานะ','เวลา'],d.topups,t=>[E(t.ref),t.method==='kbank'?'กสิกร':'TrueMoney',f(t.amount),E(stOrd[t.status]||t.status),T(t.created)])}
   <h4 style="margin:6px 0 8px">ประวัติเครดิต (ล่าสุด)</h4>${tb(['เวลา','ประเภท','จำนวน','หมายเหตุ'],d.ledger,x=>[T(x.created),E(x.kind),`<b style="color:${x.delta<0?'var(--er)':'var(--ok)'}">${x.delta>0?'+':''}${x.delta}</b>`,E((x.ref||'')+' '+(x.note||''))])}
@@ -395,6 +433,7 @@ async function doResetPw(id){const b=$('npb'),pw=$('npw').value;if(!confirm('ย
   try{const d=await api(`/api/admin/members/${id}/password`,'POST',pw?{password:pw}:{});
    $('npr').innerHTML=`<div class="prev" style="flex-direction:column;align-items:stretch;gap:8px"><span class="mut">รหัสผ่านใหม่ของ ${E(d.username)} (แสดงครั้งเดียว ส่งให้ลูกค้าแล้วแนะนำให้เปลี่ยนเอง)</span><b id="npv" style="font:600 20px ui-monospace,monospace;letter-spacing:.04em;word-break:break-all">${E(d.password)}</b><button class="btn sm" onclick="try{navigator.clipboard.writeText($('npv').textContent);say('คัดลอกแล้ว',true)}catch(e){say('คัดลอกไม่ได้ กรุณาเลือกข้อความเอง')}">คัดลอก</button></div>`;b.hidden=true;$('npw').disabled=true;say('ตั้งรหัสผ่านใหม่แล้ว',true)}
   catch(e){b.disabled=false;say(e.message)}}
+function reset2fa(id){const m=data.mem.find(x=>x.id===id);if(confirm(`ปิด 2FA ของ ${m.username}? (ใช้เมื่อเขาทำมือถือหาย) เขาต้องตั้งค่าใหม่ภายหลัง`))act(()=>api(`/api/admin/members/${id}/2fa-reset`,'POST',{}),'รีเซ็ต 2FA แล้ว')}
 function setRole(id,role){const m=data.mem.find(x=>x.id===id);if(confirm(role==='admin'?`ตั้ง ${m.username} เป็นผู้ดูแล? จะเห็นข้อมูลลูกค้า ปรับเครดิต และอนุมัติเติมเงินได้`:`ถอดสิทธิ์ผู้ดูแลของ ${m.username}?`))act(()=>api(`/api/admin/members/${id}/role`,'POST',{role}),role==='admin'?'ตั้งเป็นผู้ดูแลแล้ว (ให้เขาเข้าสู่ระบบใหม่)':'ถอดสิทธิ์แล้ว')}
 function adjust(id){
   const m=data.mem.find(x=>x.id===id);adj={id,sign:1,bal:+m.balance||0};
@@ -425,11 +464,26 @@ async function ledger(id){try{const u=data.mem.find(x=>x.id===id).username,l=awa
 function ordList(){
   const Q=data.ordQ.trim().toLowerCase(),v=data.ord.filter(o=>!Q||((o.no||'')+' '+(o.username||'')+' '+(o.product||'')).toLowerCase().includes(Q));
   $('ocnt').textContent=v.length+' รายการ · รวม '+f(v.reduce((a,o)=>a+(+o.total||0),0));
-  $('olist').innerHTML=v.length?`<div class="tw"><table><thead><tr><th>เลขที่</th><th>ผู้ซื้อ</th><th>สินค้า</th><th class="r">ราคา</th><th class="r">ส่วนลด</th><th class="r">ชำระ</th><th>เวลา</th></tr></thead><tbody>`+v.map(o=>`<tr><td><b>${E(o.no)}</b></td><td>${E(o.username)}</td><td>${E(o.product)}</td><td class="r">${f(o.price)}</td><td class="r">${o.discount?`<span class="pill p-bl">${f(o.discount)} ${E(o.coupon||'')}</span>`:'<span class="t3">-</span>'}</td><td class="r"><b style="color:var(--cy)">${f(o.total)}</b></td><td class="mut">${T(o.created)}</td></tr>`).join('')+'</tbody></table></div>':empty('ไม่พบออเดอร์','bag')}
+  $('olist').innerHTML=v.length?`<div class="tw"><table><thead><tr><th>เลขที่</th><th>ผู้ซื้อ</th><th>สินค้า</th><th class="r">ราคา</th><th class="r">ส่วนลด</th><th class="r">ชำระ</th><th>เวลา</th></tr></thead><tbody>`+v.map(o=>`<tr><td><b>${E(o.no)}</b></td><td>${E(o.username)}</td><td>${E(o.product)}</td><td class="r">${f(o.price)}</td><td class="r">${o.discount?`<span class="pill p-bl">${f(o.discount)} ${E(o.coupon||(o.tier_disc?'สมาชิก':''))}</span>`:'<span class="t3">-</span>'}</td><td class="r"><b style="color:var(--cy)">${f(o.total)}</b></td><td class="mut">${T(o.created)}</td></tr>`).join('')+'</tbody></table></div>':empty('ไม่พบออเดอร์','bag')}
 
 /* coupons & tickets */
 function addK(){act(()=>api('/api/admin/coupons','POST',{code:$('kc').value.toUpperCase(),type:$('kt').value,val:+$('kv').value,minspend:+$('km').value||0,remaining:+$('kr').value}),'เพิ่มคูปองแล้ว')}
 function delK(c){if(confirm('ลบคูปอง '+c+'?'))act(()=>api('/api/admin/coupons/'+c,'DELETE'),'ลบคูปองแล้ว')}
 function reply(id){const v=$('rp'+id).value.trim();if(!v)return;act(()=>api(`/api/admin/tickets/${id}/reply`,'POST',{reply:v}),'ส่งคำตอบแล้ว')}
+async function repLoad(){
+  data.rf=$('rf').value;data.rt=$('rt').value;data.rby=$('rby').value;
+  try{const r=await api(`/api/admin/report?from=${data.rf}&to=${data.rt}&by=${data.rby}`),t=r.totals;
+   const K=[['ยอดขาย',f(t.revenue),'money','c-ok'],['ต้นทุน',f(t.cost),'coin','c-wa'],['กำไร',f(t.profit),'chart','c-ok'],['ออเดอร์',t.orders,'bag','c-bl'],['ส่วนลดที่ให้',f(t.discount),'tag','c-pu'],['เติมเงินเข้า (อนุมัติแล้ว)',f(r.topups_in),'wallet','c-cy']];
+   $('rbody').innerHTML=`<div class="kpis">${K.map(([a,b,i,c])=>`<div class="kpi"><div class="ico ${c}">${ic(i)}</div><div><small>${a}</small><b>${b}</b></div></div>`).join('')}</div>`+
+    (r.orders_without_cost?`<div class="alert" style="margin-bottom:14px">${ic('alert')}<div>มี ${r.orders_without_cost} ออเดอร์ที่ยังไม่ได้ใส่ต้นทุนสินค้า กำไรของออเดอร์เหล่านั้นจึงเท่ากับยอดขาย ใส่ต้นทุนในหน้าสินค้าเพื่อให้ตัวเลขแม่นยำ</div></div>`:'')+
+    (r.rows.length?`<div class="tw"><table><thead><tr><th>${r.by==='month'?'เดือน':'วันที่'}</th><th class="r">ออเดอร์</th><th class="r">ยอดขาย</th><th class="r">ต้นทุน</th><th class="r">กำไร</th><th class="r">ส่วนลด</th></tr></thead><tbody>${r.rows.map(x=>`<tr><td>${E(x.period)}</td><td class="r">${x.orders}</td><td class="r">${f(x.revenue)}</td><td class="r">${f(x.cost)}</td><td class="r"><b style="color:var(--ok)">${f(x.profit)}</b></td><td class="r">${f(x.discount)}</td></tr>`).join('')}</tbody></table></div>`:empty('ไม่มียอดขายในช่วงนี้','chart'))}
+  catch(e){$('rbody').innerHTML=`<div class="alert">${ic('alert')}<div>${E(e.message)}</div></div>`}}
+async function dlFile(path,name){try{const r=await fetch(path,{headers:{Authorization:'Bearer '+tok}});if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.error||'ดาวน์โหลดไม่สำเร็จ')}const u=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2e4)}catch(e){say(e.message)}}
+function repCsv(k){const a=$('rf').value,z=$('rt').value;dlFile(`/api/admin/${k==='orders'?'orders':'report'}.csv?from=${a}&to=${z}&by=${$('rby').value}`,`${k}-${a}_${z}.csv`)}
+function resolveFlag(id){act(()=>api(`/api/admin/flags/${id}/resolve`,'POST',{}),'ปิดเรื่องแล้ว')}
+async function tfSetup(){try{const d=await api('/api/admin/2fa/setup','POST',{});$('tfbox').innerHTML=`<p class="mut" style="font-size:13px;margin-bottom:8px">1) เปิดแอป Authenticator เลือก "ป้อนรหัสด้วยตนเอง" 2) ใส่ชื่อบัญชีอะไรก็ได้ และรหัสลับด้านล่าง (แบบอิงเวลา) 3) กรอกรหัส 6 หลักที่แอปแสดง</p><div class="prev" style="margin:0 0 12px"><b class="mono" id="tfk">${E(d.secret)}</b></div><div class="fg" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"><label class="fld">รหัส 6 หลัก<input id="tcode" inputmode="numeric" maxlength="7" placeholder="000000"></label></div><div class="bar" style="margin:12px 0 0"><span class="grow"></span><button class="btn pri" onclick="tfOn()">ยืนยันและเปิดใช้</button></div>`}catch(e){say(e.message)}}
+async function tfOn(){try{const d=await api('/api/admin/2fa/enable','POST',{code:$('tcode').value});tok=d.token;localStorage.setItem('np_token',tok);say('เปิดใช้ 2FA แล้ว',true);show('sec')}catch(e){say(e.message)}}
+async function tfOff(){if(!confirm('ปิด 2FA ของบัญชีนี้?'))return;try{const d=await api('/api/admin/2fa/disable','POST',{password:$('dpw').value,code:$('dcode').value});tok=d.token;localStorage.setItem('np_token',tok);say('ปิด 2FA แล้ว',true);show('sec')}catch(e){say(e.message)}}
+function bkNow(){act(()=>api('/api/admin/backups','POST',{}),'สำรองข้อมูลแล้ว')}
 boot();
 </script></body></html>
