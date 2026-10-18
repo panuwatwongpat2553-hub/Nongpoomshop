@@ -157,18 +157,18 @@ try {
   const o0 = await api('POST', '/api/orders', { product_id: ip1 }, by.tok);
   ok('order without accepting the no-warranty terms is refused, nothing sold', o0.s === 400 && (await api('GET', '/api/products/' + ip1)).d.sold === false);
   const o1 = await api('POST', '/api/orders', { product_id: ip1, accept: true }, by.tok);
-  ok('accepted order succeeds with no tier discount yet', o1.s === 200 && o1.d.total === 1000 && o1.d.tier_discount === 0);
+  ok('accepted order succeeds at full price', o1.s === 200 && o1.d.total === 1000 && o1.d.tier_discount === undefined);
   const ip2 = await addP({ name: 'ไอดี 2', price: 1000, cost: 600 }), ip3 = await addP({ name: 'ไอดี 3', price: 1000, cost: 600 }), ip4 = await addP({ name: 'ไอดี 4', price: 1000, cost: 600 });
   await api('POST', '/api/orders', { product_id: ip2, accept: true }, by.tok);
   const me2 = (await api('GET', '/api/me', null, by.tok)).d;
-  ok('spending 2,000 makes the member Silver', me2.tier.name === 'Silver' && me2.tier.pct === 2 && me2.tier.next.name === 'Gold');
+  ok('there is no member tier any more', me2.tier === undefined);
   const o3 = await api('POST', '/api/orders', { product_id: ip3, accept: true }, by.tok);
-  ok('Silver gets 2% off automatically', o3.d.tier_discount === 20 && o3.d.total === 980);
+  ok('spending history gives no automatic discount', o3.d.discount === 0 && o3.d.total === 1000);
   await api('POST', '/api/admin/coupons', { code: 'STACK', type: 'b', val: 50, minspend: 0, remaining: 5 }, adm);
   const cs = (await api('POST', '/api/coupon-check', { product_id: ip4, code: 'stack' }, by.tok)).d;
-  ok('coupon-check stacks tier + coupon', cs.tier_discount === 20 && cs.coupon_discount === 50 && cs.total === 930);
+  ok('coupon-check applies the coupon only', cs.coupon_discount === 50 && cs.total === 950 && cs.tier_discount === undefined);
   const o4 = await api('POST', '/api/orders', { product_id: ip4, coupon: 'stack', accept: true }, by.tok);
-  ok('order applies tier first, then coupon', o4.d.total === 930 && o4.d.discount === 70);
+  ok('order applies the coupon only', o4.d.total === 950 && o4.d.discount === 50);
 
   const fsP = await addP({ name: 'ไอดีลดราคา', price: 1000, cost: 500, sale_price: 800, sale_end: Date.now() + 36e5, tags: ['sale'] });
   const fpub = (await api('GET', '/api/products/' + fsP)).d;
@@ -216,7 +216,7 @@ try {
   const f1 = fl.find(f => f.username === 'dup3');
   ok('admin resolves a flag; it leaves the open list but stays in history', (await api('POST', `/api/admin/flags/${f1.id}/resolve`, {}, adm)).s === 200 && !(await api('GET', '/api/admin/flags', null, adm)).d.some(f => f.id === f1.id) && (await api('GET', '/api/admin/flags?status=all', null, adm)).d.some(f => f.id === f1.id));
   const mdet = (await api('GET', `/api/admin/members/${by.id}`, null, adm)).d;
-  ok('member detail shows tier, referrals and flags', mdet.tier.name === 'Silver' && mdet.referrals === 2 && Array.isArray(mdet.flags));
+  ok('member detail shows spent, referrals and flags', mdet.spent >= 2000 && mdet.tier === undefined && mdet.referrals === 2 && Array.isArray(mdet.flags));
 
   const dt = ms => new Date(ms + 7 * 36e5).toISOString().slice(0, 10), span = `from=${dt(Date.now() - 864e5)}&to=${dt(Date.now() + 864e5)}`;
   const rpt = (await api('GET', `/api/admin/report?${span}`, null, adm)).d;

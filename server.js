@@ -16,7 +16,6 @@ const REF_BONUS = +process.env.REF_BONUS || 20, REF_BONUS_NEW = +process.env.REF
 const REQUIRE_2FA = process.env.ADMIN_2FA_REQUIRED === '1';
 const BACKUP_KEEP = +process.env.BACKUP_KEEP || 14, BACKUP_HOURS = +process.env.BACKUP_EVERY_HOURS || 24;
 // สมาชิกระดับต่าง ๆ ตามยอดซื้อสะสม (บาท) ส่วนลดคิดจากราคาขายอัตโนมัติ
-const TIERS = [{ name: 'Member', min: 0, pct: 0 }, { name: 'Silver', min: 2000, pct: 2 }, { name: 'Gold', min: 10000, pct: 5 }, { name: 'Platinum', min: 30000, pct: 8 }];
 const SECRET = process.env.APP_SECRET || (console.warn('WARNING: APP_SECRET not set; logins reset on restart'), crypto.randomBytes(32).toString('hex'));
 const db = new DatabaseSync(DB_FILE);
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(path.dirname(path.resolve(DB_FILE)), 'backups');
@@ -133,8 +132,6 @@ const refReward = t => {
   if (REF_BONUS_NEW) { credit(u.id, REF_BONUS_NEW, 'referral_new', 'ref:' + r.username, 'โบนัสสมาชิกใหม่ที่มีผู้แนะนำ'); addNotif(u.id, `🎁 ได้รับโบนัสสมาชิกใหม่ ${REF_BONUS_NEW} บาท`); }
 };
 const spent = uid => one('SELECT COALESCE(SUM(total),0) n FROM orders WHERE user_id=?', uid).n;
-const tierOf = s => [...TIERS].reverse().find(t => s >= t.min);
-const tierInfo = uid => { const s = spent(uid), t = tierOf(s), nx = TIERS.find(x => x.min > s); return { name: t.name, pct: t.pct, spent: s, next: nx ? { name: nx.name, need: nx.min - s, pct: nx.pct } : null }; };
 const salePrice = p => (p.sale_price && p.sale_end > now() && p.sale_price < p.price) ? p.sale_price : null;
 const effPrice = p => salePrice(p) ?? p.price;
 const decideTopup = (id, approve) => tx(() => {
@@ -212,8 +209,7 @@ route('POST', '/api/login', (req, p, b) => {
   }
   return { token: sign(u), user: { id: u.id, username: u.username, role: u.role, owner: !!u.owner, balance: u.balance } };
 });
-route('GET', '/api/me', U(({ tv, ...u }) => ({ ...u, tier: tierInfo(u.id), unread: one('SELECT COUNT(*) n FROM notifs WHERE user_id=? AND seen=0', u.id).n })));
-route('GET', '/api/tiers', () => TIERS);
+route('GET', '/api/me', U(({ tv, ...u }) => ({ ...u, unread: one('SELECT COUNT(*) n FROM notifs WHERE user_id=? AND seen=0', u.id).n })));
 route('GET', '/api/me/referral', U(u => ({ code: one('SELECT ref_code FROM users WHERE id=?', u.id).ref_code, bonus: REF_BONUS, bonus_new: REF_BONUS_NEW, min_topup: REF_MIN, max_rewards: REF_MAX,
   invited: one('SELECT COUNT(*) n FROM users WHERE referred_by=?', u.id).n, rewarded: one("SELECT COUNT(*) n FROM ledger WHERE user_id=? AND kind='referral'", u.id).n, earned: one("SELECT COALESCE(SUM(delta),0) n FROM ledger WHERE user_id=? AND kind='referral'", u.id).n })));
 route('GET', '/api/favorites', U(u => q('SELECT product_id FROM favorites WHERE user_id=? ORDER BY created DESC', u.id).map(r => r.product_id)));
@@ -234,12 +230,12 @@ route('POST', '/api/orders', U((u, p, b) => tx(() => {
   if (!run('UPDATE products SET sold=1 WHERE id=? AND sold=0', pr.id).changes) bad(409, 'ไอดีนี้ขายแล้ว');
   const c = b.coupon ? one('SELECT * FROM coupons WHERE code=?', String(b.coupon).toUpperCase()) : null;
   if (b.coupon && !c) bad(400, 'ไม่พบรหัสคูปอง');
-  const list = effPrice(pr), td = Math.floor(list * tierOf(spent(u.id)).pct / 100), cd = discount(c, list - td), d = td + cd, total = list - d, no = 'NP' + crypto.randomBytes(5).toString('hex').toUpperCase();
+  const list = effPrice(pr), cd = discount(c, list), d = cd, total = list - d, no = 'NP' + crypto.randomBytes(5).toString('hex').toUpperCase();
   if (c && cd > 0) run('UPDATE coupons SET remaining=remaining-1 WHERE code=? AND remaining>0', c.code);
   credit(u.id, -total, 'purchase', no, pr.name);
-  run('INSERT INTO orders(no,user_id,product_id,price,discount,total,coupon,created,cost,tier_disc,accepted) VALUES(?,?,?,?,?,?,?,?,?,?,?)', no, u.id, pr.id, list, d, total, cd > 0 ? c.code : null, now(), pr.cost, td, now());
+  run('INSERT INTO orders(no,user_id,product_id,price,discount,total,coupon,created,cost,accepted) VALUES(?,?,?,?,?,?,?,?,?,?)', no, u.id, pr.id, list, d, total, cd > 0 ? c.code : null, now(), pr.cost, now());
   if (one('SELECT COUNT(*) n FROM orders WHERE user_id=? AND created>?', u.id, now() - 36e5).n >= 5) flag(u.id, 'many_orders', 'สั่งซื้อ 5 รายการขึ้นไปภายใน 1 ชั่วโมง');
-  return { no, product: pr.name, price: list, discount: d, tier_discount: td, total, credentials: pr.cred };
+  return { no, product: pr.name, price: list, discount: d, total, credentials: pr.cred };
 })));
 route('GET', '/api/orders', U(u => q('SELECT o.no,o.product_id,o.price,o.discount,o.total,o.created,p.name product,p.cred credentials FROM orders o JOIN products p ON p.id=o.product_id WHERE o.user_id=? ORDER BY o.id DESC', u.id)));
 route('POST', '/api/coupon-check', U((u, p, b) => {
@@ -249,9 +245,9 @@ route('POST', '/api/coupon-check', U((u, p, b) => {
   const c = one('SELECT * FROM coupons WHERE code=?', String(b.code || '').toUpperCase());
   if (!c) bad(400, 'ไม่พบรหัสคูปอง');
   if (c.remaining < 1) bad(400, 'คูปองนี้ใช้ครบแล้ว');
-  const list = effPrice(pr), td = Math.floor(list * tierOf(spent(u.id)).pct / 100);
-  if (list - td < c.minspend) bad(400, 'ราคาสินค้าต้องไม่ต่ำกว่าขั้นต่ำ ' + c.minspend + ' บาท');
-  const cd = discount(c, list - td); return { discount: td + cd, coupon_discount: cd, tier_discount: td, total: list - td - cd };
+  const list = effPrice(pr);
+  if (list < c.minspend) bad(400, 'ราคาสินค้าต้องไม่ต่ำกว่าขั้นต่ำ ' + c.minspend + ' บาท');
+  const cd = discount(c, list); return { discount: cd, coupon_discount: cd, total: list - cd };
 }));
 route('POST', '/api/me/password', U((u, p, b) => {
   throttle('pw|' + u.id);
@@ -338,7 +334,7 @@ route('DELETE', '/api/admin/coupons/([A-Za-z0-9]+)', A((u, p) => { run('DELETE F
 const member = id => one('SELECT id,username,phone,role,owner,balance,created,last_seen,totp_on FROM users WHERE id=?', id) || bad(404, 'ไม่พบสมาชิก');
 route('GET', '/api/admin/members', A(() => q('SELECT id,username,phone,role,owner,balance,created,last_seen,totp_on FROM users ORDER BY role=\'admin\' DESC, id DESC')));
 // everything about one customer. Passwords are stored as one-way hashes and cannot be read back; use the reset route instead.
-route('GET', '/api/admin/members/(\\d+)', A((u, p) => ({ member: member(+p[1]), tier: tierInfo(+p[1]), referrals: one('SELECT COUNT(*) n FROM users WHERE referred_by=?', p[1]).n, flags: q('SELECT id,kind,detail,created,resolved FROM flags WHERE user_id=? ORDER BY id DESC LIMIT 20', p[1]),
+route('GET', '/api/admin/members/(\\d+)', A((u, p) => ({ member: member(+p[1]), spent: spent(+p[1]), referrals: one('SELECT COUNT(*) n FROM users WHERE referred_by=?', p[1]).n, flags: q('SELECT id,kind,detail,created,resolved FROM flags WHERE user_id=? ORDER BY id DESC LIMIT 20', p[1]),
   orders: q('SELECT o.no,o.price,o.discount,o.total,o.coupon,o.created,p.name product,p.cred credentials FROM orders o JOIN products p ON p.id=o.product_id WHERE o.user_id=? ORDER BY o.id DESC LIMIT 100', p[1]),
   topups: q('SELECT id,ref,method,amount,status,created,decided FROM topups WHERE user_id=? ORDER BY id DESC LIMIT 100', p[1]),
   tickets: q('SELECT id,subject,body,reply,created FROM tickets WHERE user_id=? ORDER BY id DESC LIMIT 50', p[1]),
@@ -395,8 +391,8 @@ const bkkTime = ms => new Date(ms + 7 * 36e5).toISOString().slice(0, 19).replace
 const rawCsv = (filename, rows) => ({ __raw: true, type: 'text/csv; charset=utf-8', filename, body: csv(rows) });
 route('GET', '/api/admin/report', A((u, p, b, req) => report(rangeOf(req))));
 route('GET', '/api/admin/report\\.csv', A((u, p, b, req) => { const r = rangeOf(req), d = report(r); return rawCsv(`report-${r.from}_${r.to}.csv`, [[r.by === 'month' ? 'เดือน' : 'วันที่', 'จำนวนออเดอร์', 'ยอดขาย', 'ต้นทุน', 'กำไร', 'ส่วนลดที่ให้'], ...d.rows.map(x => [x.period, x.orders, x.revenue, x.cost, x.profit, x.discount]), ['รวม', d.totals.orders, d.totals.revenue, d.totals.cost, d.totals.profit, d.totals.discount]]); }));
-route('GET', '/api/admin/orders\\.csv', A((u, p, b, req) => { const r = rangeOf(req); return rawCsv(`orders-${r.from}_${r.to}.csv`, [['เลขที่ออเดอร์', 'วันเวลา', 'สมาชิก', 'สินค้า', 'ราคาขาย', 'ส่วนลดสมาชิก', 'ส่วนลดรวม', 'คูปอง', 'ยอดชำระ', 'ต้นทุน', 'กำไร'],
-  ...q('SELECT o.no,o.created,u.username,p.name product,o.price,o.tier_disc,o.discount,o.coupon,o.total,o.cost FROM orders o JOIN users u ON u.id=o.user_id JOIN products p ON p.id=o.product_id WHERE o.created>=? AND o.created<? ORDER BY o.id', r.a, r.z).map(x => [x.no, bkkTime(x.created), x.username, x.product, x.price, x.tier_disc, x.discount, x.coupon, x.total, x.cost, x.total - x.cost])]); }));
+route('GET', '/api/admin/orders\\.csv', A((u, p, b, req) => { const r = rangeOf(req); return rawCsv(`orders-${r.from}_${r.to}.csv`, [['เลขที่ออเดอร์', 'วันเวลา', 'สมาชิก', 'สินค้า', 'ราคาขาย', 'ส่วนลดรวม', 'คูปอง', 'ยอดชำระ', 'ต้นทุน', 'กำไร'],
+  ...q('SELECT o.no,o.created,u.username,p.name product,o.price,o.discount,o.coupon,o.total,o.cost FROM orders o JOIN users u ON u.id=o.user_id JOIN products p ON p.id=o.product_id WHERE o.created>=? AND o.created<? ORDER BY o.id', r.a, r.z).map(x => [x.no, bkkTime(x.created), x.username, x.product, x.price, x.discount, x.coupon, x.total, x.cost, x.total - x.cost])]); }));
 
 route('GET', '/api/admin/flags', A((u, p, b, req) => q(`SELECT f.id,f.user_id,f.kind,f.detail,f.created,f.resolved,u.username FROM flags f JOIN users u ON u.id=f.user_id ${new URL(req.url, 'http://x').searchParams.get('status') === 'all' ? '' : 'WHERE f.resolved=0'} ORDER BY f.id DESC LIMIT 300`).map(f => ({ ...f, label: FLAG_TH[f.kind] || f.kind }))));
 route('POST', '/api/admin/flags/(\\d+)/resolve', A((u, p) => { const f = one('SELECT * FROM flags WHERE id=?', p[1]); if (!f) bad(404, 'ไม่พบรายการ'); run('UPDATE flags SET resolved=1 WHERE id=?', f.id); audit(u, 'resolve_flag', one('SELECT id,username FROM users WHERE id=?', f.user_id), FLAG_TH[f.kind] || f.kind); return { ok: true }; }));
@@ -458,7 +454,7 @@ route('GET', '/api/admin/tickets', A(() => q('SELECT t.id,t.subject,t.body,t.rep
 route('POST', '/api/admin/tickets/(\\d+)/reply', A((u, p, b) => { run('UPDATE tickets SET reply=? WHERE id=?', str(b.reply, 1, 1000, 'พิมพ์คำตอบ'), p[1]); return { ok: true }; }));
 
 // ---- server ----
-const PUB = path.resolve(__dirname, 'public'), TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
+const PUB = path.resolve(__dirname, 'public'), TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.ico': 'image/x-icon' };
 const server = http.createServer((req, res) => {
   const chunks = []; let size = 0;
   req.on('data', c => { size += c.length; if (size > 30e6) { res.writeHead(413).end(); req.destroy(); } else chunks.push(c); });
@@ -480,7 +476,16 @@ const server = http.createServer((req, res) => {
     }
     const f = path.join(PUB, path.normalize(url.pathname === '/' ? '/index.html' : url.pathname));
     if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404, sec); return res.end('Not found'); }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream', ...sec }); fs.createReadStream(f).pipe(res);
+    const ext = path.extname(f), type = TYPES[ext] || 'application/octet-stream';
+    if (path.basename(f) === 'index.html' && f === path.join(PUB, 'index.html')) {
+      // fill in the absolute site URL for link previews (Open Graph); PUBLIC_URL wins, else derived from the request host
+      const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+      const proto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() || (/^(localhost|127\.|\[::1\])/.test(host) ? 'http' : 'https');
+      const origin = (process.env.PUBLIC_URL || '').replace(/\/+$/, '') || (/^[A-Za-z0-9.-]+(:\d+)?$/.test(host) && /^https?$/.test(proto) ? proto + '://' + host : '');
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache', ...sec });
+      return res.end(fs.readFileSync(f, 'utf8').replace(/%ORIGIN%/g, origin));
+    }
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': url.pathname.startsWith('/img/') ? 'public, max-age=604800' : 'no-cache', ...sec }); fs.createReadStream(f).pipe(res);
   });
 });
 
