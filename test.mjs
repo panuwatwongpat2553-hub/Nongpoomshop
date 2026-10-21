@@ -260,5 +260,57 @@ try {
   ok('co-admin cannot list, make or download backups', (await api('GET', '/api/admin/backups', null, a2again)).s === 403 && (await api('POST', '/api/admin/backups', {}, a2again)).s === 403 && (await fetch(`http://localhost:${PORT}/api/admin/backups/download?name=${bk.d.name}`, { headers: { Authorization: 'Bearer ' + a2again } })).status === 403);
   ok('backup name traversal refused', (await fetch(`http://localhost:${PORT}/api/admin/backups/download?name=..%2f..%2fetc%2fpasswd`, { headers: { Authorization: 'Bearer ' + adm } })).status === 400);
   ok('path traversal blocked', (await fetch(`http://localhost:${PORT}/..%2f..%2fetc/passwd`)).status === 404);
+  // ---- mystery boxes ----
+  {
+    const bu = await reg('boxer', '10.9.9.9'), bt = bu.tok, bid = bu.id;
+    const mkProd = async (name, cost = 30) => (await api('POST', '/api/admin/products', { name, price: 500, cost, tags: ['BOX'], cred: 'boxcred-' + name }, adm)).d;
+    const salesBefore = (await api('GET', '/api/admin/stats', null, adm)).d.sales;
+    const A1 = (await api('POST', '/api/admin/boxes', { name: 'กล่องไอดี', price: 100 }, adm)).d;
+    ok('admin creates box', !!A1.id && A1.items.length === 0);
+    ok('non-admin cannot create box', (await api('POST', '/api/admin/boxes', { name: 'x', price: 5 }, bt)).s === 403);
+    ok('bad box price rejected', (await api('POST', '/api/admin/boxes', { name: 'x', price: 0 }, adm)).s === 400);
+    await mkProd('boxprize1');
+    const pzId = (await api('GET', '/api/admin/products', null, adm)).d.find(x => x.name === 'boxprize1').id;
+    ok('admin adds product prize', (await api('POST', `/api/admin/boxes/${A1.id}/items`, { kind: 'product', product_id: pzId, weight: 5 }, adm)).s === 200);
+    ok('same product cannot be prize twice', (await api('POST', `/api/admin/boxes/${A1.id}/items`, { kind: 'product', product_id: pzId, weight: 5 }, adm)).s === 409);
+    ok('box prize hidden from storefront', !(await api('GET', '/api/products')).d.some(x => x.id === pzId));
+    ok('box prize cannot be bought directly', (await api('POST', '/api/orders', { product_id: pzId, accept: true }, bt)).s === 404);
+    const pubBoxes = await api('GET', '/api/boxes');
+    ok('public box list shows odds, hides credentials', pubBoxes.s === 200 && pubBoxes.d.some(x => x.id === A1.id && x.items[0].odds === 100) && !JSON.stringify(pubBoxes.d).includes('boxcred'));
+    ok('open needs login', (await api('POST', `/api/boxes/${A1.id}/open`, { accept: true })).s === 401);
+    ok('open without accepting terms refused', (await api('POST', `/api/boxes/${A1.id}/open`, {}, bt)).s === 400);
+    ok('open with no credit refused', (await api('POST', `/api/boxes/${A1.id}/open`, { accept: true }, bt)).s === 400);
+    await topupOk(bt, 1000);
+    ok('stale price refused', (await api('POST', `/api/boxes/${A1.id}/open`, { accept: true, price: 50 }, bt)).s === 409);
+    const o1 = await api('POST', `/api/boxes/${A1.id}/open`, { accept: true, price: 100 }, bt);
+    ok('open gives the product prize and charges the price', o1.s === 200 && o1.d.kind === 'product' && o1.d.credentials === 'boxcred-boxprize1' && o1.d.balance === 900);
+    ok('prize appears in my orders', (await api('GET', '/api/orders', null, bt)).d.some(x => x.product_id === pzId && x.total === 100));
+    const o2 = await api('POST', `/api/boxes/${A1.id}/open`, { accept: true }, bt);
+    ok('box with all prizes taken is unavailable and charges nothing', o2.s === 409 && (await api('GET', '/api/me', null, bt)).d.balance === 900);
+    ok('sales now include the box price', (await api('GET', '/api/admin/stats', null, adm)).d.sales === salesBefore + 100);
+    const B1 = (await api('POST', '/api/admin/boxes', { name: 'กล่องเครดิต', price: 100 }, adm)).d;
+    await api('POST', `/api/admin/boxes/${B1.id}/items`, { kind: 'credit', credit_amt: 150, weight: 1 }, adm);
+    const o3 = await api('POST', `/api/boxes/${B1.id}/open`, { accept: true }, bt);
+    ok('credit prize pays out', o3.s === 200 && o3.d.kind === 'credit' && o3.d.credit === 150 && o3.d.balance === 950);
+    const led = (await api('GET', `/api/admin/ledger/${bid}`, null, adm)).d;
+    ok('ledger records box_open and box_win', led.some(x => x.kind === 'box_open' && x.delta === -100) && led.some(x => x.kind === 'box_win' && x.delta === 150));
+    ok('draw history for user and admin', (await api('GET', '/api/boxes/history', null, bt)).d.length === 2 && (await api('GET', '/api/admin/box-draws', null, adm)).d.length >= 2);
+    ok('box with draws cannot be deleted', (await api('DELETE', `/api/admin/boxes/${B1.id}`, null, adm)).s === 409);
+    const W = (await api('POST', '/api/admin/boxes', { name: 'ถ่วงน้ำหนัก', price: 1 }, adm)).d;
+    await api('POST', `/api/admin/boxes/${W.id}/items`, { kind: 'credit', credit_amt: 1, weight: 1, label: 'หายาก' }, adm);
+    await api('POST', `/api/admin/boxes/${W.id}/items`, { kind: 'credit', credit_amt: 1, weight: 99, label: 'ธรรมดา' }, adm);
+    let common = 0; for (let i = 0; i < 150; i++) if ((await api('POST', `/api/boxes/${W.id}/open`, { accept: true }, bt)).d.label === 'ธรรมดา') common++;
+    ok('weighted odds are respected (99:1)', common >= 135);
+    await api('PUT', `/api/admin/boxes/${W.id}`, { active: false }, adm);
+    ok('closed box hidden and cannot be opened', !(await api('GET', '/api/boxes')).d.some(x => x.id === W.id) && (await api('POST', `/api/boxes/${W.id}/open`, { accept: true }, bt)).s === 404);
+    const C = (await api('POST', '/api/admin/boxes', { name: 'ลบสินค้า', price: 10 }, adm)).d;
+    await mkProd('boxprize2');
+    const p2 = (await api('GET', '/api/admin/products', null, adm)).d.find(x => x.name === 'boxprize2').id;
+    await api('POST', `/api/admin/boxes/${C.id}/items`, { kind: 'product', product_id: p2, weight: 1 }, adm);
+    ok('deleting a prize product cleans the box item', (await api('DELETE', `/api/admin/products/${p2}`, null, adm)).s === 200 && (await api('GET', '/api/admin/boxes', null, adm)).d.find(x => x.id === C.id).items.length === 0);
+    const it = (await api('POST', `/api/admin/boxes/${C.id}/items`, { kind: 'credit', credit_amt: 5, weight: 2 }, adm)).d.items[0];
+    ok('admin edits and removes an item', (await api('PUT', `/api/admin/box-items/${it.id}`, { weight: 7 }, adm)).d.items[0].weight === 7 && (await api('DELETE', `/api/admin/box-items/${it.id}`, null, adm)).d.items.length === 0 && (await api('DELETE', `/api/admin/boxes/${C.id}`, null, adm)).s === 200);
+    ok('box actions are audited', (await api('GET', '/api/admin/audit', null, adm)).d.some(x => x.action === 'box_create'));
+  }
   console.log(`\nผ่านทั้งหมด ${n} ข้อ`);
 } catch (e) { console.error('\n✗ ล้มเหลว:', e.message); process.exitCode = 1; } finally { srv.kill(); lineMock.close(); }

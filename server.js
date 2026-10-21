@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS notifs(id INTEGER PRIMARY KEY, user_id INTEGER NOT NU
 CREATE INDEX IF NOT EXISTS notifs_u ON notifs(user_id,id);
 CREATE TABLE IF NOT EXISTS flags(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL, detail TEXT, created INTEGER NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
 CREATE UNIQUE INDEX IF NOT EXISTS users_ref ON users(ref_code);`);
+db.exec(`CREATE TABLE IF NOT EXISTS boxes(id INTEGER PRIMARY KEY, name TEXT NOT NULL, descr TEXT, price INTEGER NOT NULL CHECK(price>0), active INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS box_items(id INTEGER PRIMARY KEY, box_id INTEGER NOT NULL, kind TEXT NOT NULL, product_id INTEGER, credit_amt INTEGER, weight INTEGER NOT NULL CHECK(weight>0), label TEXT, created INTEGER NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS box_items_prod ON box_items(product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS box_items_box ON box_items(box_id);
+CREATE TABLE IF NOT EXISTS box_draws(id INTEGER PRIMARY KEY, box_id INTEGER NOT NULL, user_id INTEGER NOT NULL, item_id INTEGER, kind TEXT NOT NULL, label TEXT, price INTEGER NOT NULL, credit INTEGER, product_id INTEGER, order_no TEXT, created INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS box_draws_u ON box_draws(user_id,id);`);
 class HttpErr extends Error { constructor(c, m, x) { super(m); this.c = c; this.x = x; } }
 const bad = (c, m, x) => { throw new HttpErr(c, m, x); };
 const now = () => Date.now();
@@ -221,11 +227,11 @@ route('DELETE', '/api/watch', U((u, p, b, req) => { run('DELETE FROM watch WHERE
 route('GET', '/api/notifs', U(u => ({ unread: one('SELECT COUNT(*) n FROM notifs WHERE user_id=? AND seen=0', u.id).n, items: q('SELECT id,body,product_id,created,seen FROM notifs WHERE user_id=? ORDER BY id DESC LIMIT 50', u.id) })));
 route('POST', '/api/notifs/read', U(u => { run('UPDATE notifs SET seen=1 WHERE user_id=? AND seen=0', u.id); return { ok: true }; }));
 route('GET', '/api/payinfo', () => ({ truemoney: payTo('truemoney'), kbank: payTo('kbank') }));
-route('GET', '/api/products', () => q('SELECT * FROM products ORDER BY sold ASC, id DESC').map(x => pub(x)));
-route('GET', '/api/products/(\\d+)', (req, p) => { run('UPDATE products SET views=views+1 WHERE id=?', p[1]); const x = one('SELECT * FROM products WHERE id=?', p[1]); if (!x) bad(404, 'ไม่พบสินค้า'); return pub(x, true); });
+route('GET', '/api/products', () => q('SELECT * FROM products WHERE id NOT IN (SELECT product_id FROM box_items WHERE product_id IS NOT NULL) ORDER BY sold ASC, id DESC').map(x => pub(x)));
+route('GET', '/api/products/(\\d+)', (req, p) => { const x = one('SELECT * FROM products WHERE id=? AND id NOT IN (SELECT product_id FROM box_items WHERE product_id IS NOT NULL)', p[1]); if (!x) bad(404, 'ไม่พบสินค้า'); run('UPDATE products SET views=views+1 WHERE id=?', p[1]); return pub(x, true); });
 route('POST', '/api/orders', U((u, p, b) => tx(() => {
   if (b.accept !== true) bad(400, 'กรุณายอมรับเงื่อนไขก่อนสั่งซื้อ: สินค้าทุกชิ้นไม่รับประกันและไม่รับคืน');
-  const pr = one('SELECT * FROM products WHERE id=?', int(b.product_id, 1, 1e12, 'สินค้าไม่ถูกต้อง'));
+  const pr = one('SELECT * FROM products WHERE id=? AND id NOT IN (SELECT product_id FROM box_items WHERE product_id IS NOT NULL)', int(b.product_id, 1, 1e12, 'สินค้าไม่ถูกต้อง'));
   if (!pr) bad(404, 'ไม่พบสินค้า');
   if (!run('UPDATE products SET sold=1 WHERE id=? AND sold=0', pr.id).changes) bad(409, 'ไอดีนี้ขายแล้ว');
   const c = b.coupon ? one('SELECT * FROM coupons WHERE code=?', String(b.coupon).toUpperCase()) : null;
@@ -256,11 +262,50 @@ route('POST', '/api/me/password', U((u, p, b) => {
   run('UPDATE users SET pw=?, tv=tv+1 WHERE id=?', hashPw(b.next), u.id); return { ok: true, token: sign({ id: u.id, tv: u.tv + 1 }) };
 }));
 const mask = n => n.slice(0, 2) + '***';
+// ---- mystery boxes ----
+const boxItems = (boxId, withSecret) => q('SELECT i.*, p.name pname, p.sold psold FROM box_items i LEFT JOIN products p ON p.id=i.product_id WHERE i.box_id=? ORDER BY i.id', boxId).map(i => {
+  const avail = i.kind === 'credit' || (i.pname !== null && !i.psold);
+  const label = i.label || (i.kind === 'credit' ? `เครดิต ${i.credit_amt} บาท` : (i.pname || 'ไอดีสุ่ม'));
+  const o = { id: i.id, kind: i.kind, label, weight: i.weight, available: avail, credit_amt: i.kind === 'credit' ? i.credit_amt : null };
+  if (withSecret) { o.product_id = i.product_id; o.product = i.pname; o.sold = !!i.psold; }
+  return o;
+});
+const withOdds = items => { const tot = items.filter(i => i.available).reduce((s, i) => s + i.weight, 0); return items.map(i => ({ ...i, odds: i.available && tot ? Math.round(i.weight / tot * 10000) / 100 : 0 })); };
+const boxPub = b => ({ id: b.id, name: b.name, descr: b.descr, price: b.price, items: withOdds(boxItems(b.id)).map(({ weight, ...r }) => r) });
+route('GET', '/api/boxes', () => q('SELECT * FROM boxes WHERE active=1 ORDER BY id DESC').map(boxPub).filter(b => b.items.some(i => i.available)));
+route('GET', '/api/boxes/history', U(u => q('SELECT d.id,d.box_id,d.kind,d.label,d.price,d.credit,d.order_no,d.created,b.name box FROM box_draws d LEFT JOIN boxes b ON b.id=d.box_id WHERE d.user_id=? ORDER BY d.id DESC LIMIT 100', u.id)));
+route('POST', '/api/boxes/(\\d+)/open', U((u, p, b) => tx(() => {
+  if (b.accept !== true) bad(400, 'กรุณายอมรับเงื่อนไขก่อนเปิดกล่อง: ผลสุ่มไม่รับคืนและไม่รับเปลี่ยน');
+  const box = one('SELECT * FROM boxes WHERE id=? AND active=1', p[1]);
+  if (!box) bad(404, 'ไม่พบกล่องนี้หรือปิดอยู่');
+  if (b.price !== undefined && Number(b.price) !== box.price) bad(409, 'ราคากล่องมีการเปลี่ยนแปลง กรุณารีเฟรชหน้า');
+  const pool = boxItems(box.id).filter(i => i.available);
+  if (!pool.length) bad(409, 'กล่องนี้ของรางวัลหมดแล้ว');
+  let r = crypto.randomInt(pool.reduce((s, i) => s + i.weight, 0)), hit = pool[pool.length - 1];
+  for (const i of pool) { if (r < i.weight) { hit = i; break; } r -= i.weight; }
+  const raw = one('SELECT * FROM box_items WHERE id=?', hit.id);
+  const no = 'NP' + crypto.randomBytes(5).toString('hex').toUpperCase();
+  credit(u.id, -box.price, 'box_open', no, box.name);
+  const out = { kind: hit.kind, label: hit.label, price: box.price, box: box.name };
+  let pid = null, cr = null, ono = null;
+  if (hit.kind === 'product') {
+    const pr = one('SELECT * FROM products WHERE id=?', raw.product_id);
+    if (!run('UPDATE products SET sold=1 WHERE id=? AND sold=0', pr.id).changes) bad(409, 'ของรางวัลถูกใช้ไปแล้ว ลองใหม่อีกครั้ง');
+    run('INSERT INTO orders(no,user_id,product_id,price,discount,total,coupon,created,cost,accepted) VALUES(?,?,?,?,?,?,?,?,?,?)', no, u.id, pr.id, box.price, 0, box.price, null, now(), pr.cost, now());
+    pid = pr.id; ono = no; out.credentials = pr.cred; out.product = pr.name; out.no = no;
+  } else {
+    credit(u.id, raw.credit_amt, 'box_win', no, `${box.name}: ${hit.label}`);
+    cr = raw.credit_amt; out.credit = cr;
+  }
+  run('INSERT INTO box_draws(box_id,user_id,item_id,kind,label,price,credit,product_id,order_no,created) VALUES(?,?,?,?,?,?,?,?,?,?)', box.id, u.id, hit.id, hit.kind, hit.label, box.price, cr, pid, ono, now());
+  out.balance = one('SELECT balance FROM users WHERE id=?', u.id).balance;
+  return out;
+})));
 route('GET', '/api/reviews', () => q('SELECT r.stars,r.body,r.created,r.product_id,u.username FROM reviews r JOIN users u ON u.id=r.user_id ORDER BY r.id DESC LIMIT 30').map(r => ({ stars: r.stars, body: r.body, created: r.created, code: String(r.product_id).slice(-5), user: mask(r.username) })));
 // public storefront stats (real numbers only; no personal data)
 route('GET', '/api/public/stats', () => {
   const r = one('SELECT COUNT(*) n, COALESCE(AVG(stars),0) avg FROM reviews');
-  return { ready: one('SELECT COUNT(*) n FROM products WHERE sold=0').n, orders: one('SELECT COUNT(*) n FROM orders').n,
+  return { ready: one('SELECT COUNT(*) n FROM products WHERE sold=0 AND id NOT IN (SELECT product_id FROM box_items WHERE product_id IS NOT NULL)').n, orders: one('SELECT COUNT(*) n FROM orders').n,
     members: one("SELECT COUNT(*) n FROM users WHERE role='user'").n, reviews: r.n, rating: Math.round(r.avg * 10) / 10 };
 });
 route('GET', '/api/recent-sales', () => q('SELECT o.created,o.product_id,p.name,u.username FROM orders o JOIN products p ON p.id=o.product_id JOIN users u ON u.id=o.user_id ORDER BY o.id DESC LIMIT 8')
@@ -321,7 +366,7 @@ route('PUT', '/api/admin/products/(\\d+)', A((u, p, b) => {
   if (x.sale_price && salePrice(old) !== x.sale_price && !b.sold) saleNotify(old.id, x.name, x.sale_price);
   return { ok: true };
 }));
-route('DELETE', '/api/admin/products/(\\d+)', A((u, p) => { if (one('SELECT 1 x FROM orders WHERE product_id=?', p[1])) bad(409, 'สินค้ามีประวัติการขาย ลบไม่ได้'); run('DELETE FROM products WHERE id=?', p[1]); return { ok: true }; }));
+route('DELETE', '/api/admin/products/(\\d+)', A((u, p) => { if (one('SELECT 1 x FROM orders WHERE product_id=?', p[1])) bad(409, 'สินค้ามีประวัติการขาย ลบไม่ได้'); run('DELETE FROM box_items WHERE product_id=?', p[1]); run('DELETE FROM products WHERE id=?', p[1]); return { ok: true }; }));
 route('GET', '/api/admin/coupons', A(() => q('SELECT * FROM coupons')));
 route('POST', '/api/admin/coupons', A((u, p, b) => {
   const code = String(b.code || '').toUpperCase(); if (!/^[A-Z0-9]{3,20}$/.test(code)) bad(400, 'รหัสคูปองใช้ A-Z และตัวเลข 3-20 ตัว');
@@ -444,6 +489,34 @@ route('POST', '/api/admin/members/(\\d+)/2fa-reset', A((u, p) => {
   run('UPDATE users SET totp_on=0, totp_secret=NULL, totp_last=0, tv=tv+1 WHERE id=?', m.id); audit(u, '2fa_reset', m); return { ok: true };
 }));
 
+// ---- admin: mystery boxes ----
+const boxAdm = id => { const b = one('SELECT * FROM boxes WHERE id=?', id) || bad(404, 'ไม่พบกล่อง'); return { ...b, active: !!b.active, draws: one('SELECT COUNT(*) n FROM box_draws WHERE box_id=?', id).n, items: withOdds(boxItems(id, true)) }; };
+const boxIn = (b, old) => ({
+  name: str(b.name ?? (old && old.name), 1, 80, 'ชื่อกล่องไม่ถูกต้อง'), descr: str(b.descr ?? (old ? old.descr : '') ?? '', 0, 300, 'รายละเอียดยาวเกินไป'),
+  price: int(b.price ?? (old && old.price), 1, 1e6, 'ราคากล่องไม่ถูกต้อง'), active: b.active === undefined ? (old ? old.active : 1) : (b.active ? 1 : 0) });
+const itemIn = (b, old) => ({
+  weight: int(b.weight ?? (old && old.weight), 1, 1e6, 'น้ำหนักสุ่มต้องเป็นจำนวนเต็ม 1 ขึ้นไป'),
+  label: str(b.label ?? (old ? old.label : '') ?? '', 0, 60, 'ชื่อรางวัลยาวเกินไป') || null });
+route('GET', '/api/admin/boxes', A(() => q('SELECT id FROM boxes ORDER BY id DESC').map(r => boxAdm(r.id))));
+route('POST', '/api/admin/boxes', A((u, p, b) => { const x = boxIn(b); const id = Number(run('INSERT INTO boxes(name,descr,price,active,created) VALUES(?,?,?,?,?)', x.name, x.descr, x.price, x.active, now()).lastInsertRowid); audit(u, 'box_create', null, `#${id} ${x.name} ราคา ${x.price}`); return boxAdm(id); }));
+route('PUT', '/api/admin/boxes/(\\d+)', A((u, p, b) => { const old = one('SELECT * FROM boxes WHERE id=?', p[1]) || bad(404, 'ไม่พบกล่อง'), x = boxIn(b, old); run('UPDATE boxes SET name=?,descr=?,price=?,active=? WHERE id=?', x.name, x.descr, x.price, x.active, old.id); audit(u, 'box_update', null, `#${old.id} ${x.name} ราคา ${old.price}→${x.price} ${x.active ? 'เปิด' : 'ปิด'}`); return boxAdm(old.id); }));
+route('DELETE', '/api/admin/boxes/(\\d+)', A((u, p) => tx(() => { const old = one('SELECT * FROM boxes WHERE id=?', p[1]) || bad(404, 'ไม่พบกล่อง'); if (one('SELECT 1 x FROM box_draws WHERE box_id=?', old.id)) bad(409, 'กล่องมีประวัติการสุ่ม ลบไม่ได้ ให้ปิดกล่องแทน'); run('DELETE FROM box_items WHERE box_id=?', old.id); run('DELETE FROM boxes WHERE id=?', old.id); audit(u, 'box_delete', null, `#${old.id} ${old.name}`); return { ok: true }; })));
+route('POST', '/api/admin/boxes/(\\d+)/items', A((u, p, b) => tx(() => {
+  const box = one('SELECT * FROM boxes WHERE id=?', p[1]) || bad(404, 'ไม่พบกล่อง'), x = itemIn(b);
+  if (b.kind === 'product') {
+    const pid = int(b.product_id, 1, 1e12, 'สินค้าไม่ถูกต้อง'), pr = one('SELECT * FROM products WHERE id=?', pid) || bad(404, 'ไม่พบสินค้า');
+    if (pr.sold) bad(400, 'สินค้านี้ขายแล้ว ใช้เป็นรางวัลไม่ได้');
+    if (one('SELECT 1 x FROM box_items WHERE product_id=?', pid)) bad(409, 'สินค้านี้เป็นรางวัลในกล่องอยู่แล้ว');
+    run('INSERT INTO box_items(box_id,kind,product_id,weight,label,created) VALUES(?,?,?,?,?,?)', box.id, 'product', pid, x.weight, x.label, now());
+  } else if (b.kind === 'credit') {
+    run('INSERT INTO box_items(box_id,kind,credit_amt,weight,label,created) VALUES(?,?,?,?,?,?)', box.id, 'credit', int(b.credit_amt, 1, 1e6, 'จำนวนเครดิตไม่ถูกต้อง'), x.weight, x.label, now());
+  } else bad(400, 'ประเภทรางวัลต้องเป็น product หรือ credit');
+  audit(u, 'box_item_add', null, `กล่อง #${box.id} ${b.kind === 'product' ? 'สินค้า #' + b.product_id : 'เครดิต ' + b.credit_amt} น้ำหนัก ${x.weight}`);
+  return boxAdm(box.id);
+})));
+route('PUT', '/api/admin/box-items/(\\d+)', A((u, p, b) => { const old = one('SELECT * FROM box_items WHERE id=?', p[1]) || bad(404, 'ไม่พบรางวัล'), x = itemIn(b, old); const amt = old.kind === 'credit' && b.credit_amt !== undefined ? int(b.credit_amt, 1, 1e6, 'จำนวนเครดิตไม่ถูกต้อง') : old.credit_amt; run('UPDATE box_items SET weight=?,label=?,credit_amt=? WHERE id=?', x.weight, x.label, amt, old.id); audit(u, 'box_item_update', null, `กล่อง #${old.box_id} รางวัล #${old.id} น้ำหนัก ${old.weight}→${x.weight}`); return boxAdm(old.box_id); }));
+route('DELETE', '/api/admin/box-items/(\\d+)', A((u, p) => { const old = one('SELECT * FROM box_items WHERE id=?', p[1]) || bad(404, 'ไม่พบรางวัล'); run('DELETE FROM box_items WHERE id=?', old.id); audit(u, 'box_item_delete', null, `กล่อง #${old.box_id} รางวัล #${old.id}`); return boxAdm(old.box_id); }));
+route('GET', '/api/admin/box-draws', A(() => q('SELECT d.id,d.kind,d.label,d.price,d.credit,d.order_no,d.created,u.username,b.name box FROM box_draws d JOIN users u ON u.id=d.user_id LEFT JOIN boxes b ON b.id=d.box_id ORDER BY d.id DESC LIMIT 500')));
 route('GET', '/api/admin/audit', A(() => q('SELECT * FROM audit ORDER BY id DESC LIMIT 300')));
 route('GET', '/api/admin/ledger/(\\d+)', A((u, p) => q('SELECT * FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT 200', p[1])));
 route('GET', '/api/admin/orders', A(() => q('SELECT o.no,o.price,o.discount,o.total,o.coupon,o.created,u.username,p.name product FROM orders o JOIN users u ON u.id=o.user_id JOIN products p ON p.id=o.product_id ORDER BY o.id DESC LIMIT 500')));
