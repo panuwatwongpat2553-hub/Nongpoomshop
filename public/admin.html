@@ -211,6 +211,7 @@ let _tt;const say=(m,good)=>{const t=$('toast');t.textContent=m;t.classList.togg
 
 /* icons */
 const IC={
+ gift:'<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
  grid:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
  wallet:'<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
  box:'<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/>',
@@ -235,11 +236,11 @@ $('goShop').innerHTML=ic('store')+'<span>ดูหน้าร้าน</span>';
 
 const NAV=[
  ['หลัก',[['sum','ภาพรวม','grid'],['top','เติมเงิน','wallet']]],
- ['จัดการร้าน',[['prod','สินค้า','box'],['ord','ออเดอร์','bag'],['cpn','คูปอง','tag']]],
+ ['จัดการร้าน',[['prod','สินค้า','box'],['ord','ออเดอร์','bag'],['cpn','คูปอง','tag'],['box','กล่องสุ่ม','gift']]],
  ['ลูกค้า',[['mem','สมาชิก','users'],['tix','แจ้งปัญหา','chat'],['flg','พฤติกรรมน่าสงสัย','alert']]],
  ['ระบบ',[['rep','รายงานกำไร','chart'],['sec','ความปลอดภัย/สำรองข้อมูล','shield'],['aud','ประวัติการทำงาน','inbox']]]
 ];
-const HEAD={rep:['รายงานกำไร','ยอดขาย ต้นทุน กำไร รายวัน/รายเดือน และส่งออก CSV สำหรับทำบัญชี'],flg:['พฤติกรรมน่าสงสัย','ระบบแจ้งเตือนเท่านั้น ไม่บล็อกลูกค้า ให้แอดมินตรวจและตัดสินใจเอง'],sec:['ความปลอดภัยและสำรองข้อมูล','ยืนยันตัวตนสองชั้น (2FA) และไฟล์สำรองฐานข้อมูล'],sum:['ภาพรวมร้าน','สรุปยอดขายและงานที่ต้องดำเนินการวันนี้'],top:['รายการเติมเงิน','ตรวจสอบสลิปและอนุมัติเครดิตให้ลูกค้า'],prod:['สินค้า','เพิ่ม แก้ไข และจัดการไอดีที่ขาย'],ord:['ออเดอร์','ประวัติการสั่งซื้อทั้งหมด'],cpn:['คูปองส่วนลด','สร้างและจัดการรหัสส่วนลด'],mem:['สมาชิก','ดูข้อมูลลูกค้า รีเซ็ตรหัสผ่าน ปรับเครดิต และตั้งผู้ดูแล'],aud:['ประวัติการทำงานของผู้ดูแล','ใครทำอะไรกับสมาชิกและเครดิต ย้อนหลังตรวจสอบได้'],tix:['แจ้งปัญหา','ตอบเรื่องที่ลูกค้าแจ้งเข้ามา']};
+const HEAD={box:['กล่องสุ่ม','ตั้งกล่อง ราคา และของรางวัล (ไอดีหรือเครดิต) พร้อมอัตราสุ่ม และดูประวัติการสุ่ม'],rep:['รายงานกำไร','ยอดขาย ต้นทุน กำไร รายวัน/รายเดือน และส่งออก CSV สำหรับทำบัญชี'],flg:['พฤติกรรมน่าสงสัย','ระบบแจ้งเตือนเท่านั้น ไม่บล็อกลูกค้า ให้แอดมินตรวจและตัดสินใจเอง'],sec:['ความปลอดภัยและสำรองข้อมูล','ยืนยันตัวตนสองชั้น (2FA) และไฟล์สำรองฐานข้อมูล'],sum:['ภาพรวมร้าน','สรุปยอดขายและงานที่ต้องดำเนินการวันนี้'],top:['รายการเติมเงิน','ตรวจสอบสลิปและอนุมัติเครดิตให้ลูกค้า'],prod:['สินค้า','เพิ่ม แก้ไข และจัดการไอดีที่ขาย'],ord:['ออเดอร์','ประวัติการสั่งซื้อทั้งหมด'],cpn:['คูปองส่วนลด','สร้างและจัดการรหัสส่วนลด'],mem:['สมาชิก','ดูข้อมูลลูกค้า รีเซ็ตรหัสผ่าน ปรับเครดิต และตั้งผู้ดูแล'],aud:['ประวัติการทำงานของผู้ดูแล','ใครทำอะไรกับสมาชิกและเครดิต ย้อนหลังตรวจสอบได้'],tix:['แจ้งปัญหา','ตอบเรื่องที่ลูกค้าแจ้งเข้ามา']};
 function nav(){
   $('nav').innerHTML=NAV.map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,n,i])=>{
     const b=k==='top'?cnt.topups_pending:k==='tix'?cnt.tickets_open:k==='flg'?cnt.flags_open:0;
@@ -486,4 +487,58 @@ async function tfOn(){try{const d=await api('/api/admin/2fa/enable','POST',{code
 async function tfOff(){if(!confirm('ปิด 2FA ของบัญชีนี้?'))return;try{const d=await api('/api/admin/2fa/disable','POST',{password:$('dpw').value,code:$('dcode').value});tok=d.token;localStorage.setItem('np_token',tok);say('ปิด 2FA แล้ว',true);show('sec')}catch(e){say(e.message)}}
 function bkNow(){act(()=>api('/api/admin/backups','POST',{}),'สำรองข้อมูลแล้ว')}
 boot();
+
+/* ---- mystery boxes (v19) ---- */
+R.box=async()=>{
+  const [bs,ps,ds]=await Promise.all([api('/api/admin/boxes'),api('/api/admin/products'),api('/api/admin/box-draws')]);
+  data.boxes=bs;
+  const used=new Set(bs.flatMap(b=>b.items.map(i=>i.product_id).filter(Boolean)));
+  data.boxFree=ps.filter(p=>!p.sold&&!used.has(p.id));
+  const popt=data.boxFree.map(p=>`<option value="${p.id}">#${E(String(p.id).slice(-5))} ${E(p.name)} (${f(p.price)}${p.cost?' · ทุน '+f(p.cost):''})</option>`).join('');
+  const kind=i=>i.kind==='credit'?`<span class="pill p-bl">เครดิต ${f(i.credit_amt)}</span>`:`<span class="pill p-wa">ไอดี</span>`;
+  $('view').innerHTML=`<div class="card"><h3 style="margin:0 0 12px">สร้างกล่องใหม่</h3>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+    <label class="fld">ชื่อกล่อง<input id="bxn" maxlength="80" placeholder="เช่น กล่องสุ่มไอดีเกม"></label>
+    <label class="fld">ราคาต่อครั้ง (บาท)<input id="bxp" type="number" min="1" placeholder="เช่น 99"></label>
+    <label class="fld">คำอธิบายสั้น ๆ<input id="bxd" maxlength="300" placeholder="ไม่บังคับ"></label></div>
+   <div class="bar" style="margin:14px 0 0"><small class="mut" style="flex:1">สร้างแล้วเพิ่มของรางวัลด้านล่าง ลูกค้าจะเห็นกล่องเมื่อมีรางวัลที่ยังเหลืออย่างน้อย 1 อย่าง</small><button class="btn pri" onclick="bxNew()">${ic('plus')}สร้างกล่อง</button></div></div>
+   <h3 class="mut" style="font-size:13px;font-weight:500;margin:16px 0 10px">กล่องทั้งหมด (${bs.length})</h3>`+
+  (bs.length?bs.map(b=>`<div class="card"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="font-size:16px">${E(b.name)}</b><span class="pill ${b.active?'p-ok':'p-mu'}">${b.active?'เปิดขาย':'ปิดอยู่'}</span><span class="pill p-bl">${f(b.price)}</span><small class="mut">สุ่มแล้ว ${b.draws} ครั้ง</small><span class="grow"></span>
+     <button class="btn sm" onclick="bxEdit(${b.id})">แก้ไข</button><button class="btn sm" onclick="bxTog(${b.id},${b.active?0:1})">${b.active?'ปิดกล่อง':'เปิดกล่อง'}</button><button class="btn sm no" onclick="bxDel(${b.id})">ลบ</button></div>
+     ${b.descr?`<small class="mut" style="display:block;margin-top:6px">${E(b.descr)}</small>`:''}
+     <div class="tw" style="margin-top:12px"><table><thead><tr><th>รางวัล</th><th>ประเภท</th><th class="r">น้ำหนัก</th><th class="r">โอกาส</th><th>สถานะ</th><th></th></tr></thead><tbody>`+
+     (b.items.length?b.items.map(i=>`<tr><td>${E(i.label)}${i.product?` <small class="mut">(${E(i.product)})</small>`:''}</td><td>${kind(i)}</td><td class="r">${i.weight}</td><td class="r"><b>${i.odds}%</b></td><td>${i.available?'<span class="pill p-ok">พร้อม</span>':'<span class="pill p-mu">ถูกสุ่มไปแล้ว</span>'}</td><td class="r"><button class="btn sm" onclick="bxItemEdit(${b.id},${i.id})">แก้</button> <button class="btn sm no" onclick="bxItemDel(${i.id})">ลบ</button></td></tr>`).join(''):`<tr><td colspan="6" class="mut" style="text-align:center;padding:18px">ยังไม่มีของรางวัล</td></tr>`)+
+     `</tbody></table></div>
+     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px;align-items:end">
+      <label class="fld">ประเภท<select id="ik${b.id}" onchange="bxKind(${b.id})"><option value="product">ไอดีสินค้า</option><option value="credit">เครดิต</option></select></label>
+      <label class="fld" id="ipw${b.id}">เลือกสินค้า<select id="ip${b.id}">${popt||'<option value="">— ไม่มีสินค้าที่ว่าง —</option>'}</select></label>
+      <label class="fld" id="icw${b.id}" hidden>จำนวนเครดิต (บาท)<input id="ic${b.id}" type="number" min="1" placeholder="เช่น 150"></label>
+      <label class="fld">น้ำหนักสุ่ม<input id="iw${b.id}" type="number" min="1" value="1"></label>
+      <label class="fld">ชื่อที่โชว์ (ไม่บังคับ)<input id="il${b.id}" maxlength="60" placeholder="เช่น แจ็กพอต"></label>
+      <button class="btn pri" onclick="bxAddItem(${b.id})">${ic('plus')}เพิ่มรางวัล</button></div>
+     <small class="mut" style="display:block;margin-top:8px">โอกาส = น้ำหนัก ÷ น้ำหนักรวมของรางวัลที่ยังเหลือ · ไอดีที่เป็นรางวัลจะถูกซ่อนจากหน้าร้านและซื้อตรงไม่ได้ · เครดิตไม่จำกัดจำนวนครั้ง</small></div>`).join(''):empty('ยังไม่มีกล่อง','box'))+
+  `<h3 class="mut" style="font-size:13px;font-weight:500;margin:20px 0 10px">ประวัติการสุ่มล่าสุด</h3>`+
+  (ds.length?`<div class="tw"><table><thead><tr><th>เวลา</th><th>สมาชิก</th><th>กล่อง</th><th>ได้รับ</th><th class="r">ราคา</th></tr></thead><tbody>`+ds.slice(0,100).map(d=>`<tr><td class="mut">${T(d.created)}</td><td><b>${E(d.username)}</b></td><td>${E(d.box||'-')}</td><td>${d.kind==='credit'?'เครดิต '+f(d.credit):'ไอดี: '+E(d.label||'')}${d.order_no?` <small class="mut">${E(d.order_no)}</small>`:''}</td><td class="r">${f(d.price)}</td></tr>`).join('')+`</tbody></table></div>`:empty('ยังไม่มีการสุ่ม'));
+};
+function bxKind(id){const c=$('ik'+id).value==='credit';$('ipw'+id).hidden=c;$('icw'+id).hidden=!c}
+function bxNew(){act(()=>api('/api/admin/boxes','POST',{name:$('bxn').value,price:$('bxp').value,descr:$('bxd').value}),'สร้างกล่องแล้ว')}
+function bxTog(id,on){act(()=>api('/api/admin/boxes/'+id,'PUT',{active:!!on}),on?'เปิดกล่องแล้ว':'ปิดกล่องแล้ว')}
+function bxDel(id){if(confirm('ลบกล่องนี้และของรางวัลในกล่องทั้งหมด? (ทำได้เฉพาะกล่องที่ยังไม่เคยมีการสุ่ม)'))act(()=>api('/api/admin/boxes/'+id,'DELETE'),'ลบกล่องแล้ว')}
+function bxEdit(id){const b=data.boxes.find(x=>x.id===id);if(!b)return;
+  openMd('แก้ไขกล่อง',`<label class="fld">ชื่อกล่อง<input id="ebn" maxlength="80" value="${E(b.name)}"></label>
+   <label class="fld" style="margin-top:12px">ราคาต่อครั้ง (บาท)<input id="ebp" type="number" min="1" value="${b.price}"></label>
+   <label class="fld" style="margin-top:12px">คำอธิบาย<input id="ebd" maxlength="300" value="${E(b.descr||'')}"></label>`,
+   `<button class="btn" onclick="closeMd()">ยกเลิก</button><button class="btn pri" onclick="bxSave(${id})">บันทึก</button>`)}
+function bxSave(id){act(async()=>{await api('/api/admin/boxes/'+id,'PUT',{name:$('ebn').value,price:$('ebp').value,descr:$('ebd').value});closeMd()},'บันทึกแล้ว')}
+function bxAddItem(id){
+  const k=$('ik'+id).value,b={kind:k,weight:$('iw'+id).value,label:$('il'+id).value};
+  if(k==='product'){if(!$('ip'+id).value)return say('ไม่มีสินค้าที่ว่างสำหรับเป็นรางวัล');b.product_id=$('ip'+id).value}else b.credit_amt=$('ic'+id).value;
+  act(()=>api('/api/admin/boxes/'+id+'/items','POST',b),'เพิ่มรางวัลแล้ว')}
+function bxItemEdit(bid,iid){const i=data.boxes.find(x=>x.id===bid).items.find(x=>x.id===iid);if(!i)return;
+  openMd('แก้ไขรางวัล',`<label class="fld">น้ำหนักสุ่ม<input id="eiw" type="number" min="1" value="${i.weight}"></label>
+   <label class="fld" style="margin-top:12px">ชื่อที่โชว์<input id="eil" maxlength="60" value="${E(i.label)}"></label>
+   ${i.kind==='credit'?`<label class="fld" style="margin-top:12px">จำนวนเครดิต (บาท)<input id="eic" type="number" min="1" value="${i.credit_amt}"></label>`:''}`,
+   `<button class="btn" onclick="closeMd()">ยกเลิก</button><button class="btn pri" onclick="bxItemSave(${iid},${i.kind==='credit'?1:0})">บันทึก</button>`)}
+function bxItemSave(iid,cr){const b={weight:$('eiw').value,label:$('eil').value};if(cr)b.credit_amt=$('eic').value;act(async()=>{await api('/api/admin/box-items/'+iid,'PUT',b);closeMd()},'บันทึกแล้ว')}
+function bxItemDel(iid){if(confirm('ลบรางวัลนี้ออกจากกล่อง?'))act(()=>api('/api/admin/box-items/'+iid,'DELETE'),'ลบรางวัลแล้ว')}
 </script></body></html>

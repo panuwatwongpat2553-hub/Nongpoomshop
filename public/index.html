@@ -246,7 +246,39 @@ a.btn{text-decoration:none;color:#fff}
  .bnav button.on{color:var(--cy)}
  .bnav .dot{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;background:var(--bl);color:#fff;border-radius:99px;font:700 10px/1 Prompt;padding:3px 5px}
 }
-</style></head><body>
+
+.thumb .gnav,#lb .gnav{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(5,7,13,.62);color:#fff;font:700 28px/1 Prompt,sans-serif;display:grid;place-items:center;padding:0 0 4px;cursor:pointer;z-index:3;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:background .15s,transform .15s}
+.gnav:hover{background:rgba(0,229,255,.28)}.gnav:active{transform:translateY(-50%) scale(.92)}
+.gnav.gp{left:8px}.gnav.gn{right:8px}
+.gzm{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:10px;border:1px solid rgba(255,255,255,.28);background:rgba(5,7,13,.62);color:#fff;font-size:18px;cursor:pointer;z-index:3;display:grid;place-items:center}
+.gt{scroll-behavior:smooth;padding-bottom:4px}.gt img{border:2px solid transparent;opacity:.65;transition:opacity .15s,border-color .15s}.gt img.on,.gt img:hover{opacity:1}.gt img.on{border-color:var(--cy)}
+#lb{position:fixed;inset:0;z-index:60;background:rgba(2,4,10,.96);display:none;flex-direction:column;align-items:stretch;touch-action:pan-y}
+#lb.show{display:flex}html.lbo,html.lbo body{overflow:hidden}
+#lb .lbtop{display:flex;justify-content:space-between;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 8px;color:#fff;font:600 14px Prompt,sans-serif}
+#lb .lbx{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer}
+#lb .lbst{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden;position:relative}
+#lb .lbst img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;transition:transform .2s;cursor:zoom-in}
+#lb .lbst img.zm{cursor:zoom-out}
+#lb .gnav.gp{left:10px}#lb .gnav.gn{right:10px}#lb .gnav{top:50%}
+#lb.one .gnav{display:none}
+#lb .lbth{display:flex;gap:6px;overflow-x:auto;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));justify-content:flex-start;scroll-behavior:smooth}
+#lb.one .lbth{display:none}
+#lb .lbth img{width:56px;height:56px;object-fit:cover;border-radius:8px;flex:none;cursor:pointer;opacity:.55;border:2px solid transparent}
+#lb .lbth img.on{opacity:1;border-color:var(--cy)}
+@media(max-width:560px){.thumb .gnav,#lb .gnav{width:38px;height:38px;font-size:24px}#lb .gnav.gp{left:4px}#lb .gnav.gn{right:4px}}
+</style><style>
+[hidden]{display:none!important}
+.bxban{display:flex;align-items:center;gap:12px;width:100%;margin:18px 0 0;padding:14px 16px;border-radius:16px;border:1px solid var(--ln);background:linear-gradient(135deg,rgba(8,102,255,.25),rgba(138,112,255,.2));color:var(--tx);text-align:left;font-size:14px}
+.bxban b{font-size:16px}.bxban span{color:var(--t2);flex:1}.bxban i{font-style:normal;font-weight:700;color:var(--cy);white-space:nowrap}
+.bxc{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:var(--el);border:1px solid var(--ln);border-radius:14px;padding:12px 14px;color:var(--tx)}
+.bxc small{display:block;color:var(--t2);font-size:12.5px;margin-top:2px}
+.bxshake{font-size:76px;text-align:center;margin:30px 0 10px;animation:bxs .5s ease-in-out infinite}
+.bxwin{font-size:64px;text-align:center;margin:8px 0;animation:bxp .5s ease-out}
+@keyframes bxs{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) scale(1.05)}75%{transform:rotate(12deg) scale(1.05)}}
+@keyframes bxp{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.bxshake,.bxwin{animation:none}}
+</style>
+</head><body>
 <header><div class="wrap bar">
 <a class="brand" href="#top"><img src="/img/logo-96.webp" width="36" height="36" alt="Nongpoom Shop"><span>Nongpoom Shop</span></a>
 <div class="grow"></div>
@@ -266,6 +298,7 @@ a.btn{text-decoration:none;color:#fff}
 <a class="btn pri" href="#shop" style="display:inline-block">เลือกซื้อไอดี</a><div class="stats" id="stats"></div>
 
 </div><img src="/img/logo-360.webp" width="360" height="360" alt="โลโก้ Nongpoom Shop" fetchpriority="high"></div></div>
+<div class="wrap" id="bxstrip" hidden><button class="bxban" onclick="openBoxes()"><b>🎁 กล่องสุ่ม</b><span>เปิดอยู่ <b id="bxn">0</b> กล่อง ลุ้นรับไอดีหรือเครดิต</span><i>เปิดกล่อง ›</i></button></div>
 <section id="shop"><div class="wrap">
 <h2>ไอดีพร้อมขาย</h2>
 <div class="tools"><input id="q" placeholder="ค้นหาชื่อ รหัสสินค้า หรือรายละเอียด" aria-label="ค้นหา"><input id="pmin" type="number" min="0" placeholder="ราคาต่ำสุด" style="max-width:120px" aria-label="ราคาต่ำสุด"><input id="pmax" type="number" min="0" placeholder="ราคาสูงสุด" style="max-width:120px" aria-label="ราคาสูงสุด"><select id="st" aria-label="สถานะ"><option value="ok" selected>ไอดีที่ยังอยู่</option><option value="all">ทุกสถานะ</option><option value="sold">ขายแล้ว</option></select><select id="so" aria-label="เรียงลำดับ"><option value="new">ล่าสุด</option><option value="pop">ยอดนิยม</option><option value="lo">ราคาต่ำไปสูง</option><option value="hi">ราคาสูงไปต่ำ</option></select></div><div id="cnt" style="color:var(--t2);font-size:13px;margin-bottom:10px"></div>
@@ -324,6 +357,7 @@ a.btn{text-decoration:none;color:#fff}
 <button class="btn ghost" style="width:100%;margin-top:8px" onclick="closeM()">ปิด</button></div></div>
 <button class="fab" id="fab" onclick="line()" aria-label="ติดต่อร้านทาง LINE"><span aria-hidden="true">💬</span>LINE</button>
 <nav class="bnav" id="bnav" aria-label="เมนูหลัก"><button data-t="home" class="on" onclick="bnGo('home')"><i aria-hidden="true">🏠</i>หน้าแรก</button><button data-t="shop" onclick="bnGo('shop')"><i aria-hidden="true">🎮</i>ร้านค้า</button><button data-t="ord" onclick="bnGo('ord')"><i aria-hidden="true">📦</i>คำสั่งซื้อ</button><button data-t="me" onclick="bnGo('me')"><i aria-hidden="true">👤</i>บัญชี<b class="dot" id="bnd" hidden></b></button></nav>
+<div class="ov" id="mBox"><div class="modal" role="dialog" aria-label="กล่องสุ่ม"><div id="bxb"></div></div></div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -402,9 +436,32 @@ async function addP(){const n=E($("an").value.trim()),p=parseInt($("ap").value,1
  else P.push({id:Date.now(),n,c:"",p,d,t,e:"🎮",imgs:im,dt:new Date().toLocaleDateString("th-TH",{timeZone:"Asia/Bangkok"}),v:0,sold:false});
  ["an","ap","at","ad","ai"].forEach(i=>$(i).value="");alist();render();toast("บันทึกสินค้าแล้ว")}
 function buyNow(id){const p=P.find(x=>x.id==id);if(!p||p.sold)return;if(!cart.includes(id))cart.push(id);ui();closeM();drawer(1)}
-function gal(id,i){const l=imgs(P.find(p=>p.id==id));$("gm").src=l[i];$("gc").textContent=(i+1)+" / "+l.length}
+let GI=0,GID=null;
+function gal(id,i){const l=imgs(P.find(p=>p.id==id));if(!l.length)return;i=(i+l.length)%l.length;GI=i;GID=id;const m=$("gm");if(m)m.src=l[i];const c=$("gc");if(c)c.textContent=(i+1)+" / "+l.length;document.querySelectorAll("#pd .gt img").forEach((t,k)=>{t.classList.toggle("on",k==i);if(k==i)t.scrollIntoView({block:"nearest",inline:"center"})});[l[(i+1)%l.length],l[(i-1+l.length)%l.length]].forEach(u=>{const q=new Image();q.src=u})}
+function galStep(id,d){gal(id,GI+d)}
+/* ---- lightbox: ดูภาพเต็มจอ เลื่อนซ้าย/ขวา ปัดนิ้ว คีย์บอร์ด ---- */
+let LB=null;
+function lbOpen(id,i){const x=P.find(p=>p.id==id);if(!x)return;const l=imgs(x);if(!l.length)return;
+ let el=$("lb");if(!el){el=document.createElement("div");el.id="lb";el.setAttribute("role","dialog");el.setAttribute("aria-label","ดูรูปเต็มจอ");
+  el.innerHTML='<div class="lbtop"><span id="lbc"></span><button class="lbx" onclick="lbClose()" aria-label="ปิด">✕</button></div><button class="gnav gp" onclick="lbStep(-1)" aria-label="รูปก่อนหน้า">‹</button><div class="lbst" id="lbst"><img id="lbi" alt="" draggable="false"></div><button class="gnav gn" onclick="lbStep(1)" aria-label="รูปถัดไป">›</button><div class="lbth" id="lbth"></div>';
+  document.body.appendChild(el);lbBind(el)}
+ LB={id,l,i:0,z:0};$("lbth").innerHTML=l.length>1?l.map((s,k)=>`<img src="${s}" alt="รูปที่ ${k+1}" onclick="lbGo(${k})">`).join(""):"";
+ el.classList.toggle("one",l.length<2);el.classList.add("show");document.documentElement.classList.add("lbo");lbGo(i||0)}
+function lbGo(i){if(!LB)return;const n=LB.l.length;i=(i+n)%n;LB.i=i;LB.z=0;const im=$("lbi");im.style.transform="";im.classList.remove("zm");im.src=LB.l[i];$("lbc").textContent=(i+1)+" / "+n;
+ document.querySelectorAll("#lbth img").forEach((t,k)=>{t.classList.toggle("on",k==i);if(k==i)t.scrollIntoView({block:"nearest",inline:"center"})});
+ [LB.l[(i+1)%n],LB.l[(i-1+n)%n]].forEach(u=>{const q=new Image();q.src=u})}
+function lbStep(d){if(LB)lbGo(LB.i+d)}
+function lbClose(){const el=$("lb");if(!el||!LB)return;el.classList.remove("show");document.documentElement.classList.remove("lbo");const id=LB.id,i=LB.i;LB=null;if(GID==id&&$("gm"))gal(id,i)}
+function lbBind(el){const st=el.querySelector("#lbst");let x0=0,y0=0,t0=0,mv=false;
+ st.addEventListener("touchstart",e=>{if(e.touches.length!=1||(LB&&LB.z))return;x0=e.touches[0].clientX;y0=e.touches[0].clientY;t0=Date.now();mv=true},{passive:true});
+ st.addEventListener("touchend",e=>{if(!mv||!LB||LB.z)return;mv=false;const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.3&&Date.now()-t0<700){e.preventDefault();lbStep(dx<0?1:-1)}else if(dy>110&&Math.abs(dy)>Math.abs(dx)*1.5)lbClose()});
+ st.addEventListener("click",e=>{if(e.target.id!="lbi"){lbClose();return}const im=e.target;if(LB.z){LB.z=0;im.classList.remove("zm");im.style.transform="";return}const r=im.getBoundingClientRect();im.style.transformOrigin=((e.clientX-r.left)/r.width*100)+"% "+((e.clientY-r.top)/r.height*100)+"%";LB.z=1;im.classList.add("zm");im.style.transform="scale(2.2)"});
+ el.addEventListener("wheel",e=>{if(LB&&!LB.z&&Math.abs(e.deltaX)>30){e.preventDefault();lbStep(e.deltaX>0?1:-1)}},{passive:false})}
+document.addEventListener("keydown",e=>{if(LB){if(e.key=="Escape"){e.stopImmediatePropagation();lbClose()}else if(e.key=="ArrowRight")lbStep(1);else if(e.key=="ArrowLeft")lbStep(-1);return}
+ if($("mPd")&&$("mPd").classList.contains("show")&&GID!=null&&!/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||"")){if(e.key=="ArrowRight")galStep(GID,1);else if(e.key=="ArrowLeft")galStep(GID,-1)}},true);
+(function(){const m=$("pd");if(!m)return;let x0=0,y0=0,on=false;m.addEventListener("touchstart",e=>{on=!!e.target.closest("#gm")&&e.touches.length==1;if(on){x0=e.touches[0].clientX;y0=e.touches[0].clientY}},{passive:true});m.addEventListener("touchend",e=>{if(!on)return;on=false;const t=e.changedTouches[0],dx=t.clientX-x0,dy=t.clientY-y0;if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3){e.preventDefault();galStep(GID,dx<0?1:-1)}})})();
 function showP(id){const x=P.find(p=>p.id==id);if(!x)return;x.v=(x.v||0)+1;const l=imgs(x),rv=R[id]||[],bought=user&&orders.some(o=>o.items.some(i=>i.id==id)),rel=P.filter(p=>p.id!=id&&p.c==x.c).slice(0,4);
- $("pd").innerHTML=`<div class="thumb" style="height:auto;min-height:200px;border-radius:14px;cursor:default;background:#05070D">${l.length?`<img id="gm" src="${l[0]}" alt="${x.n}"><span class="gc" id="gc">1 / ${l.length}</span>`:x.e}<em class="${x.sold?"bad":"good"}">${x.sold?"ขายแล้ว":"พร้อมขาย"}</em></div>${l.length>1?`<div class="gt">${l.map((s,i)=>`<img src="${s}" alt="รูปที่ ${i+1}" onclick="gal(${id},${i})">`).join("")}</div>`:""}<h3 style="margin-top:12px">${x.n}</h3><small style="color:var(--t2)">รหัสสินค้า ${code(x)} · เพิ่มเมื่อ ${x.dt||""}</small><div class="tags" id="dtg" style="margin:6px 0">${tagsH(x)}</div>${x.op?`<span class="until">โปรลดราคาถึง ${untilT(x.se)}</span>`:""}<p style="color:var(--t2);margin:8px 0">${x.d||"ยังไม่มีรายละเอียดเพิ่มเติม"}</p>${rel.length?`<h3 style="margin-top:14px">สินค้าอื่นที่คุณอาจสนใจ</h3>${rel.map(p=>`<div class="it" style="cursor:pointer;margin-bottom:6px" onclick="showP(${p.id})"><span>${p.n}</span><span class="price" style="font-size:15px">${f(p.p)}</span></div>`).join("")}`:""}<div class="bar2">${x.sold?"":accH()}${priceH(x)}<span class="grow"></span><button class="btn ghost" id="fvd" data-id="${id}" onclick="fav(${id})" aria-label="รายการโปรด">${F.has(id)?"❤️":"🤍"}</button><button class="btn pri" id="byn" ${x.sold||!ACC?"disabled":""} onclick="buyNow(${id})">${x.sold?"ขายแล้ว":"ซื้อเลย"}</button><button class="btn ln" onclick="line()">LINE</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`;sv=0;openM("mPd");render()}
+ $("pd").innerHTML=`<div class="thumb" style="height:auto;min-height:200px;border-radius:14px;cursor:default;background:#05070D">${l.length?`<img id="gm" src="${l[0]}" alt="${x.n}" onclick="lbOpen(${id},GI)" style="cursor:zoom-in"><span class="gc" id="gc">1 / ${l.length}</span>${l.length>1?`<button class="gnav gp" onclick="event.stopPropagation();galStep(${id},-1)" aria-label="รูปก่อนหน้า">‹</button><button class="gnav gn" onclick="event.stopPropagation();galStep(${id},1)" aria-label="รูปถัดไป">›</button>`:""}<button class="gzm" onclick="event.stopPropagation();lbOpen(${id},GI)" aria-label="ดูภาพเต็มจอ">⤢</button>`:x.e}<em class="${x.sold?"bad":"good"}">${x.sold?"ขายแล้ว":"พร้อมขาย"}</em></div>${l.length>1?`<div class="gt">${l.map((s,i)=>`<img src="${s}" alt="รูปที่ ${i+1}" class="${i==0?"on":""}" onclick="gal(${id},${i})">`).join("")}</div>`:""}<h3 style="margin-top:12px">${x.n}</h3><small style="color:var(--t2)">รหัสสินค้า ${code(x)} · เพิ่มเมื่อ ${x.dt||""}</small><div class="tags" id="dtg" style="margin:6px 0">${tagsH(x)}</div>${x.op?`<span class="until">โปรลดราคาถึง ${untilT(x.se)}</span>`:""}<p style="color:var(--t2);margin:8px 0">${x.d||"ยังไม่มีรายละเอียดเพิ่มเติม"}</p>${rel.length?`<h3 style="margin-top:14px">สินค้าอื่นที่คุณอาจสนใจ</h3>${rel.map(p=>`<div class="it" style="cursor:pointer;margin-bottom:6px" onclick="showP(${p.id})"><span>${p.n}</span><span class="price" style="font-size:15px">${f(p.p)}</span></div>`).join("")}`:""}<div class="bar2">${x.sold?"":accH()}${priceH(x)}<span class="grow"></span><button class="btn ghost" id="fvd" data-id="${id}" onclick="fav(${id})" aria-label="รายการโปรด">${F.has(id)?"❤️":"🤍"}</button><button class="btn pri" id="byn" ${x.sold||!ACC?"disabled":""} onclick="buyNow(${id})">${x.sold?"ขายแล้ว":"ซื้อเลย"}</button><button class="btn ln" onclick="line()">LINE</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`;sv=0;GI=0;GID=id;openM("mPd");render()}
 function setS(n){sv=n;document.querySelectorAll("#stv button").forEach((b,i)=>b.classList.toggle("on",i<n))}
 function sendR(){const id=+$("rvp").value,t=$("rvt").value.trim();if(!sv||!t)return toast("เลือกดาวและเขียนรีวิวก่อนส่ง");if(RV.some(q=>q.k==user+id))return toast("คุณรีวิวสินค้านี้แล้ว");const it=orders.flatMap(o=>o.items).find(i=>i.id==id);RV.unshift({k:user+id,s:sv,t:E(t),u:mask(user),c:code(it),at:new Date().toLocaleDateString("th-TH",{timeZone:"Asia/Bangkok"})});sv=0;toast("ส่งรีวิวแล้ว");revHome()}
 let RV=[];
@@ -439,7 +496,19 @@ setInterval(()=>{const e=$("rvh");if(matchMedia("(prefers-reduced-motion:reduce)
 ["q","pmin","pmax"].forEach(i=>$(i).oninput=()=>{pg=1;render()});["so","st"].forEach(i=>$(i).onchange=()=>{pg=1;render()});render();revHome();ui();
 
 
-(()=>{if(matchMedia("(prefers-reduced-motion:reduce)").matches)return;const c=document.createElement("canvas");c.id="snow";c.setAttribute("aria-hidden","true");document.body.appendChild(c);const x=c.getContext("2d");let W,H,fl=[];const rs=()=>{W=c.width=innerWidth;H=c.height=innerHeight;fl=Array.from({length:Math.min(110,Math.floor(W/12))},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*2.6+.8,v:Math.random()*.9+.4,d:Math.random()*6.28}))};addEventListener("resize",rs);rs();(function t(){x.clearRect(0,0,W,H);x.fillStyle="rgba(255,255,255,.85)";for(const s of fl){s.d+=.01;s.y+=s.v;s.x+=Math.sin(s.d)*.5;if(s.y>H+5){s.y=-5;s.x=Math.random()*W}x.beginPath();x.arc(s.x,s.y,s.r,0,6.283);x.fill()}requestAnimationFrame(t)})()})();
+(()=>{if(matchMedia("(prefers-reduced-motion:reduce)").matches)return;const c=document.createElement("canvas");c.id="snow";c.setAttribute("aria-hidden","true");document.body.appendChild(c);const x=c.getContext("2d");let W,H,fl=[];
+/* เกล็ดหิมะ 6 แฉก วาดเป็นสไปรต์ไว้ก่อน 3 แบบ แล้วนำไปหมุนตกลงมา */
+const mk=k=>{const z=64,o=document.createElement("canvas");o.width=o.height=z;const g=o.getContext("2d");g.translate(z/2,z/2);g.strokeStyle="rgba(255,255,255,.95)";g.lineCap="round";g.shadowColor="rgba(160,225,255,.9)";g.shadowBlur=3;g.lineWidth=k==2?3:2.2;const L=26;
+ for(let i=0;i<6;i++){g.save();g.rotate(i*Math.PI/3);g.beginPath();g.moveTo(0,0);g.lineTo(0,-L);g.stroke();g.lineWidth=k==2?2.2:1.6;
+  if(k==0){g.beginPath();g.moveTo(0,-L*.55);g.lineTo(-L*.28,-L*.8);g.moveTo(0,-L*.55);g.lineTo(L*.28,-L*.8);g.stroke()}
+  else if(k==1){g.beginPath();g.moveTo(0,-L*.4);g.lineTo(-L*.22,-L*.62);g.moveTo(0,-L*.4);g.lineTo(L*.22,-L*.62);g.moveTo(0,-L*.72);g.lineTo(-L*.16,-L*.9);g.moveTo(0,-L*.72);g.lineTo(L*.16,-L*.9);g.stroke()}
+  else{g.beginPath();g.moveTo(-L*.2,-L*.7);g.lineTo(0,-L*.95);g.lineTo(L*.2,-L*.7);g.stroke()}
+  g.restore()}
+ g.fillStyle="rgba(255,255,255,.95)";g.beginPath();g.arc(0,0,2.2,0,6.283);g.fill();return o},SP=[mk(0),mk(1),mk(2)];
+const rs=()=>{W=c.width=innerWidth;H=c.height=innerHeight;fl=Array.from({length:Math.min(70,Math.floor(W/16))},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*8+5,v:Math.random()*.8+.35,d:Math.random()*6.28,a:Math.random()*6.28,w:(Math.random()-.5)*.02,k:Math.floor(Math.random()*3),o:Math.random()*.4+.55}))};
+addEventListener("resize",rs);rs();
+(function t(){x.clearRect(0,0,W,H);for(const s of fl){s.d+=.01;s.a+=s.w;s.y+=s.v;s.x+=Math.sin(s.d)*.5;if(s.y>H+20){s.y=-20;s.x=Math.random()*W}
+ x.save();x.globalAlpha=s.o;x.translate(s.x,s.y);x.rotate(s.a);const z=s.r*2;x.drawImage(SP[s.k],-z/2,-z/2,z,z);x.restore()}requestAnimationFrame(t)})()})();
 
 // ---- Nongpoom production top-up integration (same-origin backend) ----
 const NP_API = '';
@@ -689,7 +758,7 @@ function paintMenu(){
   if(user){h+=`<div class="mc"><b>${npEsc(user)}</b><div class="row"><span style="color:var(--t2);font-size:13px">เครดิต</span><span class="price" style="font-size:18px">${f(bal)}</span></div></div>`;
     h+='<h4>บัญชีของฉัน</h4>'+it('top','💰','เติมเครดิต')+it('ord','📦','คำสั่งซื้อและประวัติเติมเงิน')+it('fav','❤️','รายการโปรด')+it('not','🔔','การแจ้งเตือน',UN>0?(UN>99?'99+':UN):'')+it('pro','👤','บัญชีและชวนเพื่อน')+(adm?it('adm','🛠️','จัดการร้าน'):'');
   }else{h+=`<div class="mc"><b>ยินดีต้อนรับ</b><span style="color:var(--t2);font-size:13px">เข้าสู่ระบบเพื่อเติมเครดิตและสั่งซื้อ</span></div>`+it('login','🔑','เข้าสู่ระบบ')+it('reg','✨','สมัครสมาชิก')}
-  h+='<h4>ร้านค้า</h4>'+it('shop','🎮','เลือกซื้อไอดี')+it('rev','⭐','รีวิวจากผู้ซื้อ')+it('how','📖','วิธีสั่งซื้อ');
+  h+='<h4>ร้านค้า</h4>'+it('shop','🎮','เลือกซื้อไอดี')+it('box','🎁','กล่องสุ่ม')+it('rev','⭐','รีวิวจากผู้ซื้อ')+it('how','📖','วิธีสั่งซื้อ');
   h+='<h4>ช่วยเหลือ</h4>'+it('line','💬','ติดต่อร้านทาง LINE')+it('faq','❓','คำถามที่พบบ่อย')+it('sup','🆘','แจ้งปัญหา')+it('pt','📄','ข้อกำหนดการใช้งาน')+it('pp','🔒','นโยบายความเป็นส่วนตัว')+it('pr','↩️','นโยบายคืนเงิน');
   if(user)h+='<h4></h4>'+`<button class="mi out" onclick="menuGo('out')"><span class="ic" aria-hidden="true">🚪</span>ออกจากระบบ</button>`;
   $('mn').innerHTML=h;
@@ -712,6 +781,58 @@ function bnGo(k){
   document.querySelectorAll('#bnav [data-t]').forEach(b=>{if(b.dataset.t==='home'||b.dataset.t==='shop')b.classList.toggle('on',b.dataset.t===on)});
   const d=$('bnd');if(d){d.hidden=!(user&&UN>0);d.textContent=UN>99?'99+':UN}};
  let ly=scrollY;addEventListener('scroll',()=>{if(!tk)tk=requestAnimationFrame(bn);const y=scrollY,f=$('fab');if(f){if(y>ly+6&&y>300)f.classList.add('hid');else if(y<ly-6||y<=300)f.classList.remove('hid')}ly=y},{passive:true});setInterval(bn,2000);bn()}
+
+// ---- v19: mystery boxes ----
+let BX=[],BXO=null,BXA=false,BXB=false;
+async function bxLoad(){try{BX=await npReq('/api/boxes')}catch(e){BX=[]}const s=$('bxstrip');if(s){s.hidden=!BX.length;$('bxn').textContent=BX.length}}
+async function openBoxes(){await bxLoad();bxList();openM('mBox')}
+function bxList(){
+  BXO=null;BXA=false;
+  $('bxb').innerHTML=`<h3>🎁 กล่องสุ่ม</h3><div class="note">เลือกกล่อง จ่ายด้วยเครดิต แล้วลุ้นรับไอดีหรือเครดิต อัตราสุ่มแสดงชัดเจนก่อนเปิดทุกกล่อง</div><div class="items">`+
+  (BX.length?BX.map(b=>`<button class="bxc" onclick="bxPick(${b.id})"><span><b>${npEsc(b.name)}</b><small>${npEsc(b.descr||'ลุ้นรับของรางวัล')}</small></span><span class="price">${f(b.price)}</span></button>`).join(''):`<div class="empty">ยังไม่มีกล่องที่เปิดอยู่ในตอนนี้</div>`)+
+  `</div><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="bxHist()">ประวัติการเปิดกล่อง</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`;
+}
+function bxPick(id){
+  const b=BX.find(x=>x.id===id);if(!b)return;BXO=b;BXA=false;
+  const its=b.items.filter(i=>i.available).sort((a,c)=>c.odds-a.odds);
+  $('bxb').innerHTML=`<h3>${npEsc(b.name)}</h3>${b.descr?`<p style="color:var(--t2);font-size:14px;margin-bottom:8px">${npEsc(b.descr)}</p>`:''}
+  <div class="row" style="margin:0 0 8px"><span style="color:var(--t2);font-size:13px">ราคาต่อครั้ง</span><span class="price">${f(b.price)}</span></div>
+  <h4 style="font-size:13px;color:var(--t2);margin:10px 0 6px">ของรางวัลและโอกาสที่จะได้</h4>
+  <div class="items">${its.map(i=>`<div class="it"><span>${i.kind==='credit'?'💰':'🎮'} ${npEsc(i.label)}</span><b>${i.odds}%</b></div>`).join('')}</div>
+  <label class="acc" style="margin-top:12px"><input type="checkbox" onchange="BXA=this.checked"><span>ฉันรับทราบว่าผลสุ่มเป็นที่สิ้นสุด <b>ไม่รับคืนเงินและไม่รับเปลี่ยนของรางวัล</b></span></label>
+  <div class="row" style="margin-top:12px"><button class="btn ghost" onclick="bxList()">‹ กลับ</button><button class="btn pri" id="bxgo" onclick="bxOpen()">เปิดกล่อง ${f(b.price)}</button></div>`;
+}
+async function bxOpen(){
+  if(!user){closeM();return openM('mLogin')}
+  const b=BXO;if(!b||BXB)return;
+  if(!BXA)return toast('กรุณาติ๊กยอมรับเงื่อนไขก่อนเปิดกล่อง');
+  if(bal<b.price)return toast('เครดิตไม่พอ กรุณาเติมเครดิตก่อน');
+  BXB=true;const go=$('bxgo');go.disabled=true;
+  try{
+    const r=await npReq('/api/boxes/'+b.id+'/open','POST',{accept:true,price:b.price});
+    bal=Number(r.balance);ui();
+    $('bxb').innerHTML=`<div class="bxshake" id="bxan">🎁</div><p style="text-align:center;color:var(--t2)">กำลังเปิดกล่อง…</p>`;
+    await new Promise(z=>setTimeout(z,1100));
+    const win=r.kind==='credit'
+      ?`<div class="bxwin">💰</div><h3 style="text-align:center">คุณได้รับเครดิต ${f(r.credit)}</h3><p style="text-align:center;color:var(--t2)">${npEsc(r.label)} · เพิ่มเข้ากระเป๋าเครดิตแล้ว</p>`
+      :`<div class="bxwin">🎮</div><h3 style="text-align:center">คุณได้รับไอดี!</h3><p style="text-align:center;color:var(--t2)">${npEsc(r.product||r.label)}</p><div class="note" style="user-select:all;white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:13.5px;color:var(--tx)">${npEsc(r.credentials||'')}</div><button class="btn ghost" style="width:100%" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(String(r.credentials||'')).replace(/</g,'\\u003c').replace(/"/g,'&quot;')}).then(()=>toast('คัดลอกแล้ว'))">คัดลอกข้อมูลไอดี</button><p class="note">ข้อมูลนี้บันทึกอยู่ในคำสั่งซื้อของคุณด้วย เลขที่ ${npEsc(r.no)}</p>`;
+    $('bxb').innerHTML=win+`<p style="text-align:center;color:var(--t2);font-size:13px">เครดิตคงเหลือ ${f(r.balance)}</p><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="openBoxes()">กล่องอื่น</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`;
+    npRefresh();bxLoad();
+  }catch(e){
+    toast(e.message);BXB=false;
+    if(/เปลี่ยนแปลง|หมดแล้ว|ไม่พบ/.test(e.message)){await bxLoad();return bxList()}
+    if(go)go.disabled=false;return;
+  }
+  BXB=false;
+}
+async function bxHist(){
+  if(!user){closeM();return openM('mLogin')}
+  try{const h=await npReq('/api/boxes/history');
+    $('bxb').innerHTML=`<h3>ประวัติการเปิดกล่อง</h3><div class="items">`+(h.length?h.map(x=>`<div class="it" style="flex-direction:column"><div class="row" style="margin:0;padding:0"><b>${npEsc(x.box||'กล่อง')}</b><span style="color:var(--t2);font-size:13px">${npTime(x.created)}</span></div><span>${x.kind==='credit'?'💰 ได้เครดิต '+f(x.credit):'🎮 ได้ไอดี '+npEsc(x.label||'')}${x.order_no?` · ${npEsc(x.order_no)}`:''}</span><span style="color:var(--t2);font-size:13px">จ่าย ${f(x.price)}</span></div>`).join(''):`<div class="empty">ยังไม่เคยเปิดกล่อง</div>`)+`</div><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="bxList()">‹ กลับ</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`}
+  catch(e){toast(e.message)}
+}
+MN.box=()=>openBoxes();
+bxLoad();setInterval(bxLoad,60000);
 
 npLoadProducts();npLoadReviews();npLoadStats();
 if(npToken)npRefresh();
