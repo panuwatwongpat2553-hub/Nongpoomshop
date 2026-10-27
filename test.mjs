@@ -265,7 +265,7 @@ try {
     ok('box prize hidden from storefront', !(await api('GET', '/api/products')).d.some(x => x.id === pzId));
     ok('box prize cannot be bought directly', (await api('POST', '/api/orders', { product_id: pzId, accept: true }, bt)).s === 404);
     const pubBoxes = await api('GET', '/api/boxes');
-    ok('public box list shows odds, hides credentials', pubBoxes.s === 200 && pubBoxes.d.some(x => x.id === A1.id && x.items[0].odds === 100) && !JSON.stringify(pubBoxes.d).includes('boxcred'));
+    ok('public box list hides odds/weights and credentials', !JSON.stringify(pubBoxes.d).match(/"odds"|"weight"/) && pubBoxes.s === 200 && pubBoxes.d.some(x => x.id === A1.id && x.items.length > 0) && !JSON.stringify(pubBoxes.d).includes('boxcred'));
     ok('open needs login', (await api('POST', `/api/boxes/${A1.id}/open`, { accept: true })).s === 401);
     ok('open without accepting terms refused', (await api('POST', `/api/boxes/${A1.id}/open`, {}, bt)).s === 400);
     ok('open with no credit refused', (await api('POST', `/api/boxes/${A1.id}/open`, { accept: true }, bt)).s === 400);
@@ -318,16 +318,16 @@ try {
   ok('LINE test message is sent on request (even over the monthly cap)', (await api('POST', '/api/admin/line/test', {}, adm)).s === 200 && lineHits.length === before + 1 && lineHits[before].body.messages[0].text.includes('ทดสอบ'));
   const tl = (await api('GET', '/api/admin/topups', null, adm)).d;
   ok('top-up list carries reviewer context (approved count, flags)', tl.length > 0 && tl.every(x => typeof x.approved_n === 'number' && typeof x.flags_n === 'number'));
-  // 2FA is mandatory by default: second server with no ADMIN_2FA_REQUIRED
+  // 2FA is optional by default; ADMIN_2FA_REQUIRED=1 forces it (second server)
   const P2 = 3996, DB2 = '/tmp/np-test2.db'; for (const f of [DB2, DB2 + '-wal', DB2 + '-shm']) fs.rmSync(f, { force: true });
-  const e2 = { ...process.env, PORT: P2, DB_FILE: DB2, APP_SECRET: 'x2', ADMIN_USER: 'boss', ADMIN_PASS: 'bosspassword1', BACKUP_DIR: '/tmp/np-test2-bk' }; delete e2.ADMIN_2FA_REQUIRED;
+  const e2 = { ...process.env, PORT: P2, DB_FILE: DB2, APP_SECRET: 'x2', ADMIN_USER: 'boss', ADMIN_PASS: 'bosspassword1', BACKUP_DIR: '/tmp/np-test2-bk', ADMIN_2FA_REQUIRED: '1' };
   const srv2 = spawn('node', ['--no-warnings', 'server.js'], { env: e2, stdio: 'ignore' });
   try {
     await new Promise(r => setTimeout(r, 1200));
     const a2 = (await (await fetch(`http://localhost:${P2}/api/login`, { method: 'POST', body: JSON.stringify({ username: 'boss', password: 'bosspassword1' }) })).json()).token;
     const g = p => fetch(`http://localhost:${P2}${p}`, { headers: { Authorization: 'Bearer ' + a2 } });
     const r1 = await g('/api/admin/stats'); const j1 = await r1.json();
-    ok('2FA required by default: admin without 2FA is blocked and told to set it up', r1.status === 403 && j1.need_2fa_setup === true);
+    ok('ADMIN_2FA_REQUIRED=1 forces 2FA: admin without 2FA is blocked and told to set it up', r1.status === 403 && j1.need_2fa_setup === true);
     ok('…but can still reach the 2FA setup endpoints', (await g('/api/admin/2fa')).status === 200);
   } finally { srv2.kill(); }
   console.log(`\nผ่านทั้งหมด ${n} ข้อ`);

@@ -277,6 +277,44 @@ a.btn{text-decoration:none;color:#fff}
 @keyframes bxs{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) scale(1.05)}75%{transform:rotate(12deg) scale(1.05)}}
 @keyframes bxp{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){.bxshake,.bxwin{animation:none}}
+/* ---- v23 visual polish ---- */
+:root{--gold:#FFC857;--pk:#FF5FA2}
+body{background:radial-gradient(900px 500px at 12% -5%,rgba(138,112,255,.16),transparent 60%),radial-gradient(800px 500px at 100% 18%,rgba(22,217,255,.10),transparent 60%),var(--bg);background-attachment:fixed}
+.hero{background:radial-gradient(55% 80% at 82% 40%,rgba(8,102,255,.42),transparent 70%),radial-gradient(40% 60% at 8% 90%,rgba(138,112,255,.28),transparent 70%),var(--bg)}
+.hero::before,.hero::after{content:"";position:absolute;border-radius:50%;filter:blur(60px);opacity:.5;pointer-events:none;animation:orb 9s ease-in-out infinite}
+.hero::before{width:220px;height:220px;left:-60px;top:-40px;background:var(--pu)}
+.hero::after{width:260px;height:260px;right:-80px;bottom:-90px;background:var(--cy);animation-delay:-4s}
+@keyframes orb{50%{transform:translate(24px,18px) scale(1.12)}}
+.hero .wrap{position:relative;z-index:1}
+.hero h1 span{background-size:200% auto;animation:shine 6s linear infinite}
+@keyframes shine{to{background-position:200% center}}
+.hero img{box-shadow:0 0 70px rgba(8,102,255,.55),0 0 0 1px rgba(255,255,255,.08)}
+.pri{position:relative;overflow:hidden}
+.pri::after{content:"";position:absolute;top:0;left:-70%;width:45%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:sweep 3.6s ease-in-out infinite}
+@keyframes sweep{0%,55%{left:-70%}100%{left:140%}}
+.hero .btn.pri{padding:13px 28px;font-size:16px;border-radius:14px}
+.stats>div{background:rgba(17,26,45,.6);border:1px solid var(--ln);border-radius:14px;padding:10px 16px}
+.trust{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0 0}
+.trust div{display:flex;align-items:center;gap:10px;background:linear-gradient(160deg,rgba(17,26,45,.85),rgba(11,16,32,.85));border:1px solid var(--ln);border-radius:14px;padding:11px 13px;font-size:13px;color:var(--t2);line-height:1.3}
+.trust b{display:block;color:var(--tx);font-size:13.5px}
+.trust span{font-size:22px;flex:none}
+.bxban{position:relative;overflow:hidden;border:1px solid rgba(255,200,87,.55);background:linear-gradient(110deg,rgba(255,95,162,.28),rgba(138,112,255,.3) 45%,rgba(255,200,87,.28));box-shadow:0 0 28px rgba(255,200,87,.22);animation:glow 2.8s ease-in-out infinite}
+.bxban::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.28),transparent);transform:skewX(-20deg);animation:sweep 3.2s ease-in-out infinite}
+.bxban>b:first-child{font-size:18px;background:linear-gradient(90deg,var(--gold),#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.bxban i{color:#1a0d00;background:linear-gradient(135deg,var(--gold),#FF9F43);padding:6px 12px;border-radius:99px;font-size:13px}
+@keyframes glow{50%{box-shadow:0 0 40px rgba(255,200,87,.42)}}
+section h2{position:relative;display:flex;align-items:center;gap:10px;font-weight:800}
+section h2::before{content:"";width:5px;height:1.1em;border-radius:4px;background:linear-gradient(var(--cy),var(--pu));flex:none}
+.card{animation:rise .5s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.grid .card:nth-child(2){animation-delay:.05s}.grid .card:nth-child(3){animation-delay:.1s}.grid .card:nth-child(4){animation-delay:.15s}.grid .card:nth-child(n+5){animation-delay:.2s}
+.card:hover{border-color:transparent;background:linear-gradient(160deg,rgba(24,38,68,.95),rgba(11,16,32,.95))}
+.card .price{text-shadow:none;background:linear-gradient(90deg,var(--cy),#7DF9FF);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:800}
+.card.sold{animation:none}
+.rsl>div{transition:transform .2s,border-color .2s}.rsl>div:hover{transform:translateX(4px);border-color:var(--cy)}
+.bxc{transition:transform .15s,border-color .15s,box-shadow .15s}.bxc:hover{transform:translateY(-2px);border-color:var(--gold);box-shadow:0 6px 22px rgba(255,200,87,.18)}
+@media(max-width:720px){.trust{grid-template-columns:1fr 1fr}.trust div{padding:9px 10px;font-size:12px}.hero .btn.pri{display:block!important;text-align:center}.stats>div{padding:8px 12px}}
+@media(prefers-reduced-motion:reduce){.hero::before,.hero::after,.hero h1 span,.pri::after,.bxban,.bxban::after,.card{animation:none}}
 </style>
 </head><body>
 <header><div class="wrap bar">
@@ -298,6 +336,7 @@ a.btn{text-decoration:none;color:#fff}
 <a class="btn pri" href="#shop" style="display:inline-block">เลือกซื้อไอดี</a><div class="stats" id="stats"></div>
 
 </div><img src="/img/logo-360.webp" width="360" height="360" alt="โลโก้ Nongpoom Shop" fetchpriority="high"></div></div>
+<div class="wrap"><div class="trust"><div><span>⚡</span><p><b>รับข้อมูลไอดีทันที</b>แสดงให้เลยหลังซื้อสำเร็จ</p></div><div><span>🔐</span><p><b>ข้อมูลไม่โชว์สาธารณะ</b>เห็นเฉพาะผู้ซื้อเท่านั้น</p></div><div><span>🛟</span><p><b>แจ้งปัญหาได้ในเว็บ</b>ทีมงานตอบกลับในระบบ</p></div><div><span>🎁</span><p><b>กล่องสุ่มลุ้นรางวัล</b>ไอดีหรือเครดิตฟรี</p></div></div></div>
 <div class="wrap" id="bxstrip" hidden><button class="bxban" onclick="openBoxes()"><b>🎁 กล่องสุ่ม</b><span>เปิดอยู่ <b id="bxn">0</b> กล่อง ลุ้นรับไอดีหรือเครดิต</span><i>เปิดกล่อง ›</i></button></div>
 <section id="shop"><div class="wrap">
 <h2>ไอดีพร้อมขาย</h2>
@@ -782,17 +821,17 @@ async function bxLoad(){try{BX=await npReq('/api/boxes')}catch(e){BX=[]}const s=
 async function openBoxes(){await bxLoad();bxList();openM('mBox')}
 function bxList(){
   BXO=null;BXA=false;
-  $('bxb').innerHTML=`<h3>🎁 กล่องสุ่ม</h3><div class="note">เลือกกล่อง จ่ายด้วยเครดิต แล้วลุ้นรับไอดีหรือเครดิต อัตราสุ่มแสดงชัดเจนก่อนเปิดทุกกล่อง</div><div class="items">`+
+  $('bxb').innerHTML=`<h3>🎁 กล่องสุ่ม</h3><div class="note">เลือกกล่อง จ่ายด้วยเครดิต แล้วลุ้นรับไอดีหรือเครดิต</div><div class="items">`+
   (BX.length?BX.map(b=>`<button class="bxc" onclick="bxPick(${b.id})"><span><b>${npEsc(b.name)}</b><small>${npEsc(b.descr||'ลุ้นรับของรางวัล')}</small></span><span class="price">${f(b.price)}</span></button>`).join(''):`<div class="empty">ยังไม่มีกล่องที่เปิดอยู่ในตอนนี้</div>`)+
   `</div><div class="row" style="margin-top:12px"><button class="btn ghost" onclick="bxHist()">ประวัติการเปิดกล่อง</button><button class="btn ghost" onclick="closeM()">ปิด</button></div>`;
 }
 function bxPick(id){
   const b=BX.find(x=>x.id===id);if(!b)return;BXO=b;BXA=false;
-  const its=b.items.filter(i=>i.available).sort((a,c)=>c.odds-a.odds);
+  const its=b.items.filter(i=>i.available);
   $('bxb').innerHTML=`<h3>${npEsc(b.name)}</h3>${b.descr?`<p style="color:var(--t2);font-size:14px;margin-bottom:8px">${npEsc(b.descr)}</p>`:''}
   <div class="row" style="margin:0 0 8px"><span style="color:var(--t2);font-size:13px">ราคาต่อครั้ง</span><span class="price">${f(b.price)}</span></div>
-  <h4 style="font-size:13px;color:var(--t2);margin:10px 0 6px">ของรางวัลและโอกาสที่จะได้</h4>
-  <div class="items">${its.map(i=>`<div class="it"><span>${i.kind==='credit'?'💰':'🎮'} ${npEsc(i.label)}</span><b>${i.odds}%</b></div>`).join('')}</div>
+  <h4 style="font-size:13px;color:var(--t2);margin:10px 0 6px">ของรางวัลที่มีลุ้น</h4>
+  <div class="items">${its.map(i=>`<div class="it"><span>${i.kind==='credit'?'💰':'🎮'} ${npEsc(i.label)}</span></div>`).join('')}</div>
   <label class="acc" style="margin-top:12px"><input type="checkbox" onchange="BXA=this.checked"><span>ฉันรับทราบว่าผลสุ่มเป็นที่สิ้นสุด <b>ไม่รับคืนเงินและไม่รับเปลี่ยนของรางวัล</b></span></label>
   <div class="row" style="margin-top:12px"><button class="btn ghost" onclick="bxList()">‹ กลับ</button><button class="btn pri" id="bxgo" onclick="bxOpen()">เปิดกล่อง ${f(b.price)}</button></div>`;
 }

@@ -12,7 +12,7 @@ const payTo = m => { const [name, account] = (PAY[m] || '').split('|'); return a
 // LINE alerts to the shop owner (Messaging API push). Off unless both variables are set. Free plans have a small monthly quota, so only actionable events notify and a monthly cap applies.
 const LINE_TOKEN = process.env.LINE_CHANNEL_TOKEN || '', LINE_TO = process.env.LINE_ADMIN_USER_ID || '', LINE_API = process.env.LINE_API || 'https://api.line.me', LINE_MAX = +process.env.LINE_MAX_PER_MONTH || 150;
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
-const REQUIRE_2FA = process.env.ADMIN_2FA_REQUIRED !== '0'; // on by default; set ADMIN_2FA_REQUIRED=0 to make 2FA optional
+const REQUIRE_2FA = process.env.ADMIN_2FA_REQUIRED === '1'; // optional by default (admins may still turn it on themselves); set ADMIN_2FA_REQUIRED=1 to force it
 const BACKUP_REMIND_DAYS = +process.env.BACKUP_REMIND_DAYS || 7;
 const BACKUP_KEEP = +process.env.BACKUP_KEEP || 14, BACKUP_HOURS = +process.env.BACKUP_EVERY_HOURS || 24;
 // สมาชิกระดับต่าง ๆ ตามยอดซื้อสะสม (บาท) ส่วนลดคิดจากราคาขายอัตโนมัติ
@@ -252,7 +252,7 @@ const boxItems = (boxId, withSecret) => q('SELECT i.*, p.name pname, p.sold psol
   return o;
 });
 const withOdds = items => { const tot = items.filter(i => i.available).reduce((s, i) => s + i.weight, 0); return items.map(i => ({ ...i, odds: i.available && tot ? Math.round(i.weight / tot * 10000) / 100 : 0 })); };
-const boxPub = b => ({ id: b.id, name: b.name, descr: b.descr, price: b.price, items: withOdds(boxItems(b.id)).map(({ weight, ...r }) => r) });
+const boxPub = b => ({ id: b.id, name: b.name, descr: b.descr, price: b.price, items: boxItems(b.id).map(({ weight, ...r }) => r) }); // odds/weights are admin-only
 route('GET', '/api/boxes', () => q('SELECT * FROM boxes WHERE active=1 ORDER BY id DESC').map(boxPub).filter(b => b.items.some(i => i.available)));
 route('GET', '/api/boxes/history', U(u => q('SELECT d.id,d.box_id,d.kind,d.label,d.price,d.credit,d.order_no,d.created,b.name box FROM box_draws d LEFT JOIN boxes b ON b.id=d.box_id WHERE d.user_id=? ORDER BY d.id DESC LIMIT 100', u.id)));
 route('POST', '/api/boxes/(\\d+)/open', U((u, p, b) => tx(() => {
