@@ -9,7 +9,7 @@ for (const f of [DB, DB + '-wal', DB + '-shm']) fs.rmSync(f, { force: true });
 fs.rmSync('/tmp/np-test-backups', { recursive: true, force: true });
 const lineHits = [];
 const lineMock = http.createServer((req, res) => { let d = ''; req.on('data', c => d += c); req.on('end', () => { lineHits.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(d || '{}') }); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); }); }).listen(4999);
-const srv = spawn('node', ['--no-warnings', 'server.js'], { env: { ...process.env, PORT, DB_FILE: DB, APP_SECRET: 'testsecret', WEBHOOK_SECRET: WH, PAY_KBANK: 'ทดสอบ ระบบ|000-0-00000-0', PAY_TRUEMONEY: 'ทดสอบ ระบบ|000-000-0000', ADMIN_USER: 'boss', TRUST_PROXY: '1', BACKUP_DIR: '/tmp/np-test-backups', ADMIN_PASS: 'bosspassword1', LINE_CHANNEL_TOKEN: 'linetok', LINE_ADMIN_USER_ID: 'Uadmin1', LINE_API: 'http://localhost:4999', LINE_MAX_PER_MONTH: '5' }, stdio: 'ignore' });
+const srv = spawn('node', ['--no-warnings', 'server.js'], { env: { ...process.env, PORT, DB_FILE: DB, APP_SECRET: 'testsecret', ADMIN_2FA_REQUIRED: '0', WEBHOOK_SECRET: WH, PAY_KBANK: 'ทดสอบ ระบบ|000-0-00000-0', PAY_TRUEMONEY: 'ทดสอบ ระบบ|000-000-0000', ADMIN_USER: 'boss', TRUST_PROXY: '1', BACKUP_DIR: '/tmp/np-test-backups', ADMIN_PASS: 'bosspassword1', LINE_CHANNEL_TOKEN: 'linetok', LINE_ADMIN_USER_ID: 'Uadmin1', LINE_API: 'http://localhost:4999', LINE_MAX_PER_MONTH: '5' }, stdio: 'ignore' });
 await new Promise(r => setTimeout(r, 1200));
 const slipImg = n => 'data:image/png;base64,' + Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('slip' + n)]).toString('base64');
 const api = async (m, p, b, t, h = {}) => { const raw = b ? JSON.stringify(b) : undefined; const r = await fetch(`http://localhost:${PORT}${p}`, { method: m, body: raw, headers: { ...(t ? { Authorization: 'Bearer ' + t } : {}), ...h } }); return { s: r.status, d: await r.json().catch(() => ({})), raw }; };
@@ -176,24 +176,13 @@ try {
   ok('sale price must be below normal price', (await api('POST', '/api/admin/products', { name: 'x', price: 500, sale_price: 500, sale_end: Date.now() + 1e5 }, adm)).s === 400);
   const exP = await addP({ name: 'โปรหมดอายุ', price: 500, sale_price: 100, sale_end: Date.now() - 1000 });
   ok('already-expired promotion is dropped', (await api('GET', '/api/products/' + exP)).d.sale_price === null);
-  const by2 = await reg('buyer2', '10.0.0.2', { ref: (await api('GET', '/api/me/referral', null, by.tok)).d.code }); await fund(by2.id, 5000);
+  const by2 = await reg('buyer2', '10.0.0.2'); await fund(by2.id, 5000);
   const os = await api('POST', '/api/orders', { product_id: fsP, accept: true }, by2.tok);
   ok('buying a flash-sale item charges the sale price', os.s === 200 && os.d.price === 800 && os.d.total === 800);
 
-  ok('bad referral code refused at signup', (await reg('buyerx', '10.0.0.5', { ref: 'NOPE' })).s === 400);
-  const rf = (await api('GET', '/api/me/referral', null, by.tok)).d;
-  ok('referral stats: 1 invited, nothing earned yet', rf.invited === 1 && rf.earned === 0 && /^NP[A-Z0-9]{5}$/.test(rf.code));
-  const b1before = await bal(by.tok);
-  await topupOk(by2.tok, 50);
-  ok('first top-up below the minimum pays no bonus yet', await bal(by.tok) === b1before);
-  await topupOk(by2.tok, 100);
-  ok('friend’s first qualifying top-up pays the referrer', await bal(by.tok) === b1before + 20);
-  await topupOk(by2.tok, 100);
-  ok('bonus is paid only once per friend', await bal(by.tok) === b1before + 20 && (await api('GET', '/api/me/referral', null, by.tok)).d.earned === 20);
-  const by3 = await reg('buyer3', '10.0.0.1', { ref: rf.code });
-  await topupOk(by3.tok, 100);
-  ok('referral from the same network is not paid and gets flagged', await bal(by.tok) === b1before + 20 && (await api('GET', '/api/admin/flags', null, adm)).d.some(f => f.kind === 'self_referral' && f.username === 'buyer3'));
+  ok('referral system is gone: endpoint 404, ref code ignored at signup', (await api('GET', '/api/me/referral', null, by.tok)).s === 404 && (await reg('buyerx', '10.0.0.5', { ref: 'NOPE' })).s === 200);
 
+  const by3 = await reg('buyer3', '10.0.0.1');
   const pf = await addP({ name: 'ไอดีถูกใจ', price: 500, tags: ['ROV'] });
   ok('favorite add and list', (await api('POST', '/api/favorites', { product_id: pf }, by.tok)).s === 200 && (await api('GET', '/api/favorites', null, by.tok)).d.includes(pf));
   ok('favorite of unknown product refused', (await api('POST', '/api/favorites', { product_id: 99999999 }, by.tok)).s === 404);
@@ -216,7 +205,7 @@ try {
   const f1 = fl.find(f => f.username === 'dup3');
   ok('admin resolves a flag; it leaves the open list but stays in history', (await api('POST', `/api/admin/flags/${f1.id}/resolve`, {}, adm)).s === 200 && !(await api('GET', '/api/admin/flags', null, adm)).d.some(f => f.id === f1.id) && (await api('GET', '/api/admin/flags?status=all', null, adm)).d.some(f => f.id === f1.id));
   const mdet = (await api('GET', `/api/admin/members/${by.id}`, null, adm)).d;
-  ok('member detail shows spent, referrals and flags', mdet.spent >= 2000 && mdet.tier === undefined && mdet.referrals === 2 && Array.isArray(mdet.flags));
+  ok('member detail shows spent and flags', mdet.spent >= 2000 && mdet.tier === undefined && mdet.referrals === undefined && Array.isArray(mdet.flags));
 
   const dt = ms => new Date(ms + 7 * 36e5).toISOString().slice(0, 10), span = `from=${dt(Date.now() - 864e5)}&to=${dt(Date.now() + 864e5)}`;
   const rpt = (await api('GET', `/api/admin/report?${span}`, null, adm)).d;
@@ -312,5 +301,34 @@ try {
     ok('admin edits and removes an item', (await api('PUT', `/api/admin/box-items/${it.id}`, { weight: 7 }, adm)).d.items[0].weight === 7 && (await api('DELETE', `/api/admin/box-items/${it.id}`, null, adm)).d.items.length === 0 && (await api('DELETE', `/api/admin/boxes/${C.id}`, null, adm)).s === 200);
     ok('box actions are audited', (await api('GET', '/api/admin/audit', null, adm)).d.some(x => x.action === 'box_create'));
   }
+
+  // ---- v22: ops features ----
+  ok('healthz answers ok', (await api('GET', '/healthz')).s === 200);
+  const nf = await fetch(`http://localhost:${PORT}/no-such-page`, { headers: { Accept: 'text/html' } });
+  ok('unknown page returns a Thai 404 html page', nf.status === 404 && (await nf.text()).includes('ไม่พบหน้าที่คุณต้องการ'));
+  ok('unknown file without html accept stays plain 404', (await fetch(`http://localhost:${PORT}/nope.js`)).status === 404);
+  const sys = await api('GET', '/api/admin/system', null, adm);
+  ok('owner sees system status (storage, backup, line)', sys.s === 200 && typeof sys.d.storage.db_dir === 'string' && typeof sys.d.backup.stale === 'boolean' && sys.d.line.configured === true && sys.d.line.max === 5);
+  ok('system status is not available to non-admins', (await api('GET', '/api/admin/system', null, tok)).s === 403);
+  const bks = (await api('GET', '/api/admin/backups', null, adm)).d.items;
+  const bd = await fetch(`http://localhost:${PORT}/api/admin/backups/download?name=${encodeURIComponent(bks[0].name)}`, { headers: { Authorization: 'Bearer ' + adm } });
+  await bd.arrayBuffer();
+  ok('downloading a backup clears the off-machine reminder', bd.status === 200 && (await api('GET', '/api/admin/system', null, adm)).d.backup.stale === false && (await api('GET', '/api/admin/stats', null, adm)).d.backup_stale === false);
+  const before = lineHits.length;
+  ok('LINE test message is sent on request (even over the monthly cap)', (await api('POST', '/api/admin/line/test', {}, adm)).s === 200 && lineHits.length === before + 1 && lineHits[before].body.messages[0].text.includes('ทดสอบ'));
+  const tl = (await api('GET', '/api/admin/topups', null, adm)).d;
+  ok('top-up list carries reviewer context (approved count, flags)', tl.length > 0 && tl.every(x => typeof x.approved_n === 'number' && typeof x.flags_n === 'number'));
+  // 2FA is mandatory by default: second server with no ADMIN_2FA_REQUIRED
+  const P2 = 3996, DB2 = '/tmp/np-test2.db'; for (const f of [DB2, DB2 + '-wal', DB2 + '-shm']) fs.rmSync(f, { force: true });
+  const e2 = { ...process.env, PORT: P2, DB_FILE: DB2, APP_SECRET: 'x2', ADMIN_USER: 'boss', ADMIN_PASS: 'bosspassword1', BACKUP_DIR: '/tmp/np-test2-bk' }; delete e2.ADMIN_2FA_REQUIRED;
+  const srv2 = spawn('node', ['--no-warnings', 'server.js'], { env: e2, stdio: 'ignore' });
+  try {
+    await new Promise(r => setTimeout(r, 1200));
+    const a2 = (await (await fetch(`http://localhost:${P2}/api/login`, { method: 'POST', body: JSON.stringify({ username: 'boss', password: 'bosspassword1' }) })).json()).token;
+    const g = p => fetch(`http://localhost:${P2}${p}`, { headers: { Authorization: 'Bearer ' + a2 } });
+    const r1 = await g('/api/admin/stats'); const j1 = await r1.json();
+    ok('2FA required by default: admin without 2FA is blocked and told to set it up', r1.status === 403 && j1.need_2fa_setup === true);
+    ok('…but can still reach the 2FA setup endpoints', (await g('/api/admin/2fa')).status === 200);
+  } finally { srv2.kill(); }
   console.log(`\nผ่านทั้งหมด ${n} ข้อ`);
 } catch (e) { console.error('\n✗ ล้มเหลว:', e.message); process.exitCode = 1; } finally { srv.kill(); lineMock.close(); }

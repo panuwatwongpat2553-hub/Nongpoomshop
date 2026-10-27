@@ -12,8 +12,8 @@ const payTo = m => { const [name, account] = (PAY[m] || '').split('|'); return a
 // LINE alerts to the shop owner (Messaging API push). Off unless both variables are set. Free plans have a small monthly quota, so only actionable events notify and a monthly cap applies.
 const LINE_TOKEN = process.env.LINE_CHANNEL_TOKEN || '', LINE_TO = process.env.LINE_ADMIN_USER_ID || '', LINE_API = process.env.LINE_API || 'https://api.line.me', LINE_MAX = +process.env.LINE_MAX_PER_MONTH || 150;
 const TRUST_PROXY = process.env.TRUST_PROXY === '1';
-const REF_BONUS = +process.env.REF_BONUS || 20, REF_BONUS_NEW = +process.env.REF_BONUS_NEW || 0, REF_MIN = +process.env.REF_MIN_TOPUP || 100, REF_MAX = +process.env.REF_MAX_REWARDS || 50;
-const REQUIRE_2FA = process.env.ADMIN_2FA_REQUIRED === '1';
+const REQUIRE_2FA = process.env.ADMIN_2FA_REQUIRED !== '0'; // on by default; set ADMIN_2FA_REQUIRED=0 to make 2FA optional
+const BACKUP_REMIND_DAYS = +process.env.BACKUP_REMIND_DAYS || 7;
 const BACKUP_KEEP = +process.env.BACKUP_KEEP || 14, BACKUP_HOURS = +process.env.BACKUP_EVERY_HOURS || 24;
 // สมาชิกระดับต่าง ๆ ตามยอดซื้อสะสม (บาท) ส่วนลดคิดจากราคาขายอัตโนมัติ
 const SECRET = process.env.APP_SECRET || (console.warn('WARNING: APP_SECRET not set; logins reset on restart'), crypto.randomBytes(32).toString('hex'));
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS watch(user_id INTEGER NOT NULL, tag TEXT NOT NULL, PR
 CREATE TABLE IF NOT EXISTS notifs(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, body TEXT NOT NULL, product_id INTEGER, created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS notifs_u ON notifs(user_id,id);
 CREATE TABLE IF NOT EXISTS flags(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL, detail TEXT, created INTEGER NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
-CREATE UNIQUE INDEX IF NOT EXISTS users_ref ON users(ref_code);`);
+DROP INDEX IF EXISTS users_ref;`);
 db.exec(`CREATE TABLE IF NOT EXISTS boxes(id INTEGER PRIMARY KEY, name TEXT NOT NULL, descr TEXT, price INTEGER NOT NULL CHECK(price>0), active INTEGER NOT NULL DEFAULT 1, created INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS box_items(id INTEGER PRIMARY KEY, box_id INTEGER NOT NULL, kind TEXT NOT NULL, product_id INTEGER, credit_amt INTEGER, weight INTEGER NOT NULL CHECK(weight>0), label TEXT, created INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS box_items_prod ON box_items(product_id) WHERE product_id IS NOT NULL;
@@ -69,8 +69,6 @@ const notify = text => {
 
 const ipOf = req => (TRUST_PROXY && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()) || req.socket.remoteAddress || '';
 const ipHash = req => crypto.createHash('sha256').update(ipOf(req) + SECRET).digest('hex').slice(0, 16);
-const newRef = () => { for (;;) { const c = 'NP' + Array.from(crypto.randomBytes(5), x => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 32]).join(''); if (!one('SELECT 1 x FROM users WHERE ref_code=?', c)) return c; } };
-for (const r of q('SELECT id FROM users WHERE ref_code IS NULL')) run('UPDATE users SET ref_code=? WHERE id=?', newRef(), r.id);
 
 // ---- 2FA (TOTP, RFC 6238 — compatible with Google Authenticator / Authy) ----
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -116,7 +114,7 @@ const credit = (uid, delta, kind, ref, note) => {
   if (!r.changes) bad(400, 'เครดิตไม่พอ');
   run('INSERT INTO ledger(user_id,delta,kind,ref,note,created) VALUES(?,?,?,?,?,?)', uid, delta, kind, ref || null, note || null, now());
 };
-const FLAG_TH = { multi_account: 'หลายบัญชีจากเครือข่ายเดียวกัน', rapid_topup: 'ส่งสลิปถี่ผิดปกติ', large_first_topup: 'เติมเงินก้อนใหญ่ครั้งแรก', similar_topup: 'ยอดเติมตรงกับสมาชิกอื่น', many_orders: 'ซื้อถี่ผิดปกติ', self_referral: 'แนะนำเพื่อนจากเครือข่ายเดียวกัน' };
+const FLAG_TH = { multi_account: 'หลายบัญชีจากเครือข่ายเดียวกัน', rapid_topup: 'ส่งสลิปถี่ผิดปกติ', large_first_topup: 'เติมเงินก้อนใหญ่ครั้งแรก', similar_topup: 'ยอดเติมตรงกับสมาชิกอื่น', many_orders: 'ซื้อถี่ผิดปกติ' };
 // Flags are advisory only: they never block anyone, they just put the case in front of the admin.
 const flag = (uid, kind, detail) => {
   if (one('SELECT 1 x FROM flags WHERE user_id=? AND kind=? AND resolved=0', uid, kind)) return;
@@ -124,19 +122,6 @@ const flag = (uid, kind, detail) => {
   if (kind !== 'similar_topup') notify(`⚠️ พฤติกรรมน่าสงสัย: ${FLAG_TH[kind] || kind}\nสมาชิก ${(one('SELECT username FROM users WHERE id=?', uid) || {}).username}\n${detail || ''}`);
 };
 const addNotif = (uid, body, pid) => run('INSERT INTO notifs(user_id,body,product_id,created) VALUES(?,?,?,?)', uid, body, pid || null, now());
-// Referral: paid once, on the referred member's first approved top-up of at least REF_MIN baht.
-const refReward = t => {
-  const u = one('SELECT * FROM users WHERE id=?', t.user_id);
-  if (!u || !u.referred_by || u.ref_paid || t.amount < REF_MIN) return;
-  const r = one('SELECT * FROM users WHERE id=?', u.referred_by);
-  run('UPDATE users SET ref_paid=1 WHERE id=?', u.id);
-  if (!r) return;
-  if (r.reg_ip && r.reg_ip === u.reg_ip) return flag(u.id, 'self_referral', `ผู้แนะนำ ${r.username} สมัครจากเครือข่ายเดียวกัน ไม่จ่ายโบนัส`);
-  if (one("SELECT COUNT(*) n FROM ledger WHERE user_id=? AND kind='referral'", r.id).n >= REF_MAX) return;
-  credit(r.id, REF_BONUS, 'referral', 'from:' + u.username, 'โบนัสแนะนำเพื่อน');
-  addNotif(r.id, `🎁 เพื่อนที่คุณแนะนำเติมเงินครั้งแรกแล้ว ได้รับโบนัส ${REF_BONUS} บาท`);
-  if (REF_BONUS_NEW) { credit(u.id, REF_BONUS_NEW, 'referral_new', 'ref:' + r.username, 'โบนัสสมาชิกใหม่ที่มีผู้แนะนำ'); addNotif(u.id, `🎁 ได้รับโบนัสสมาชิกใหม่ ${REF_BONUS_NEW} บาท`); }
-};
 const spent = uid => one('SELECT COALESCE(SUM(total),0) n FROM orders WHERE user_id=?', uid).n;
 const salePrice = p => (p.sale_price && p.sale_end > now() && p.sale_price < p.price) ? p.sale_price : null;
 const effPrice = p => salePrice(p) ?? p.price;
@@ -146,7 +131,7 @@ const decideTopup = (id, approve) => tx(() => {
   if (t.status !== 'pending') bad(409, 'รายการนี้ดำเนินการแล้ว');
   if (approve && !t.slip) bad(400, 'รายการนี้ไม่มีสลิป อนุมัติไม่ได้');
   run('UPDATE topups SET status=?, decided=? WHERE id=?', approve ? 'approved' : 'rejected', now(), id);
-  if (approve) { credit(t.user_id, t.amount, 'topup', t.ref, t.method); refReward(t); }
+  if (approve) { credit(t.user_id, t.amount, 'topup', t.ref, t.method); }
   return { ...t, status: approve ? 'approved' : 'rejected' };
 });
 const discount = (c, s) => (!c || c.remaining < 1 || s < c.minspend) ? 0 : Math.min(s, c.type === 'p' ? Math.floor(s * c.val / 100) : c.val);
@@ -193,10 +178,8 @@ route('POST', '/api/register', (req, p, b) => {
   if (!/^0\d{9}$/.test(phone)) bad(400, 'เบอร์โทรไม่ถูกต้อง');
   if (typeof b.password !== 'string' || b.password.length < 8 || b.password.length > 200) bad(400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');
   const ipH = ipHash(req); throttle('reg|' + ipH, 20);
-  let refBy = null;
-  if (b.ref) { const r = one('SELECT id FROM users WHERE ref_code=?', String(b.ref).trim().toUpperCase()); if (!r) bad(400, 'รหัสแนะนำเพื่อนไม่ถูกต้อง'); refBy = r.id; }
   try {
-    const r = run('INSERT INTO users(username,phone,pw,created,ref_code,referred_by,reg_ip) VALUES(?,?,?,?,?,?,?)', username, phone, hashPw(b.password), now(), newRef(), refBy, ipH), id = Number(r.lastInsertRowid);
+    const r = run('INSERT INTO users(username,phone,pw,created,reg_ip) VALUES(?,?,?,?,?)', username, phone, hashPw(b.password), now(), ipH), id = Number(r.lastInsertRowid);
     if (one('SELECT COUNT(*) n FROM users WHERE reg_ip=? AND created>? AND id<>?', ipH, now() - 864e5, id).n >= 2) flag(id, 'multi_account', 'สมัครสมาชิก 3 บัญชีขึ้นไปจากเครือข่ายเดียวกันภายใน 24 ชั่วโมง');
     return { token: sign({ id }), user: { id, username, balance: 0 } };
   } catch (e) { if (/UNIQUE/.test(e.message)) bad(409, 'ชื่อผู้ใช้นี้ถูกใช้แล้ว'); throw e; }
@@ -216,8 +199,6 @@ route('POST', '/api/login', (req, p, b) => {
   return { token: sign(u), user: { id: u.id, username: u.username, role: u.role, owner: !!u.owner, balance: u.balance } };
 });
 route('GET', '/api/me', U(({ tv, ...u }) => ({ ...u, unread: one('SELECT COUNT(*) n FROM notifs WHERE user_id=? AND seen=0', u.id).n })));
-route('GET', '/api/me/referral', U(u => ({ code: one('SELECT ref_code FROM users WHERE id=?', u.id).ref_code, bonus: REF_BONUS, bonus_new: REF_BONUS_NEW, min_topup: REF_MIN, max_rewards: REF_MAX,
-  invited: one('SELECT COUNT(*) n FROM users WHERE referred_by=?', u.id).n, rewarded: one("SELECT COUNT(*) n FROM ledger WHERE user_id=? AND kind='referral'", u.id).n, earned: one("SELECT COALESCE(SUM(delta),0) n FROM ledger WHERE user_id=? AND kind='referral'", u.id).n })));
 route('GET', '/api/favorites', U(u => q('SELECT product_id FROM favorites WHERE user_id=? ORDER BY created DESC', u.id).map(r => r.product_id)));
 route('POST', '/api/favorites', U((u, p, b) => { const id = int(b.product_id, 1, 1e12, 'สินค้าไม่ถูกต้อง'); if (!one('SELECT 1 x FROM products WHERE id=?', id)) bad(404, 'ไม่พบสินค้า'); if (one('SELECT COUNT(*) n FROM favorites WHERE user_id=?', u.id).n >= 200) bad(400, 'รายการโปรดเต็มแล้ว (200 รายการ)'); run('INSERT OR IGNORE INTO favorites(user_id,product_id,created) VALUES(?,?,?)', u.id, id, now()); return { ok: true }; }));
 route('DELETE', '/api/favorites/(\\d+)', U((u, p) => { run('DELETE FROM favorites WHERE user_id=? AND product_id=?', u.id, p[1]); return { ok: true }; }));
@@ -354,7 +335,8 @@ route('GET', '/api/admin/stats', A(() => ({
   products_ready: one('SELECT COUNT(*) n FROM products WHERE sold=0').n, products_sold: one('SELECT COUNT(*) n FROM products WHERE sold=1').n,
   orders: one('SELECT COUNT(*) n FROM orders').n, sales: one('SELECT COALESCE(SUM(total),0) n FROM orders').n,
   members: one("SELECT COUNT(*) n FROM users WHERE role='user'").n, credit_total: one('SELECT COALESCE(SUM(balance),0) n FROM users').n,
-  profit: one('SELECT COALESCE(SUM(total-cost),0) n FROM orders').n, flags_open: one('SELECT COUNT(*) n FROM flags WHERE resolved=0').n, topups_pending: one("SELECT COUNT(*) n FROM topups WHERE status='pending'").n, tickets_open: one('SELECT COUNT(*) n FROM tickets WHERE reply IS NULL').n })));
+  profit: one('SELECT COALESCE(SUM(total-cost),0) n FROM orders').n, flags_open: one('SELECT COUNT(*) n FROM flags WHERE resolved=0').n, topups_pending: one("SELECT COUNT(*) n FROM topups WHERE status='pending'").n, tickets_open: one('SELECT COUNT(*) n FROM tickets WHERE reply IS NULL').n,
+  backup_stale: one('SELECT COUNT(*) n FROM users').n > 1 && backupInfo().stale, storage_warn: hosted && storageInfo().persistent === false })));
 const adm = x => ({ ...pub(x), cred: x.cred, cost: x.cost, sale_price: x.sale_price, sale_end: x.sale_end, sale_active: !!salePrice(x) });
 route('GET', '/api/admin/products', A(() => q('SELECT * FROM products ORDER BY id DESC').map(x => adm(x))));
 route('GET', '/api/admin/products/(\\d+)', A((u, p) => { const x = one('SELECT * FROM products WHERE id=?', p[1]); if (!x) bad(404, 'ไม่พบสินค้า'); return { ...adm(x), imgs: JSON.parse(x.imgs || '[]') }; }));
@@ -379,7 +361,7 @@ route('DELETE', '/api/admin/coupons/([A-Za-z0-9]+)', A((u, p) => { run('DELETE F
 const member = id => one('SELECT id,username,phone,role,owner,balance,created,last_seen,totp_on FROM users WHERE id=?', id) || bad(404, 'ไม่พบสมาชิก');
 route('GET', '/api/admin/members', A(() => q('SELECT id,username,phone,role,owner,balance,created,last_seen,totp_on FROM users ORDER BY role=\'admin\' DESC, id DESC')));
 // everything about one customer. Passwords are stored as one-way hashes and cannot be read back; use the reset route instead.
-route('GET', '/api/admin/members/(\\d+)', A((u, p) => ({ member: member(+p[1]), spent: spent(+p[1]), referrals: one('SELECT COUNT(*) n FROM users WHERE referred_by=?', p[1]).n, flags: q('SELECT id,kind,detail,created,resolved FROM flags WHERE user_id=? ORDER BY id DESC LIMIT 20', p[1]),
+route('GET', '/api/admin/members/(\\d+)', A((u, p) => ({ member: member(+p[1]), spent: spent(+p[1]), flags: q('SELECT id,kind,detail,created,resolved FROM flags WHERE user_id=? ORDER BY id DESC LIMIT 20', p[1]),
   orders: q('SELECT o.no,o.price,o.discount,o.total,o.coupon,o.created,p.name product,p.cred credentials FROM orders o JOIN products p ON p.id=o.product_id WHERE o.user_id=? ORDER BY o.id DESC LIMIT 100', p[1]),
   topups: q('SELECT id,ref,method,amount,status,created,decided FROM topups WHERE user_id=? ORDER BY id DESC LIMIT 100', p[1]),
   tickets: q('SELECT id,subject,body,reply,created FROM tickets WHERE user_id=? ORDER BY id DESC LIMIT 50', p[1]),
@@ -459,7 +441,36 @@ route('GET', '/api/admin/backups/download', A((u, p, b, req) => {
   owner(u); const n = String(new URL(req.url, 'http://x').searchParams.get('name') || '');
   if (!/^shop-[\w.-]+\.db$/.test(n)) bad(400, 'ชื่อไฟล์ไม่ถูกต้อง');
   const f = path.join(BACKUP_DIR, n); if (!fs.existsSync(f)) bad(404, 'ไม่พบไฟล์สำรอง');
-  audit(u, 'download_backup', null, n); return { __raw: true, type: 'application/octet-stream', filename: n, file: f };
+  audit(u, 'download_backup', null, n); run('INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v', 'bk_dl', now()); return { __raw: true, type: 'application/octet-stream', filename: n, file: f };
+}));
+
+
+// ---- system status (owner): data volume, off-machine backup reminder, LINE ----
+const storageInfo = () => {
+  try {
+    const dir = fs.realpathSync(path.dirname(path.resolve(DB_FILE)));
+    let best = '/';
+    for (const l of fs.readFileSync('/proc/mounts', 'utf8').split('\n')) {
+      const mp = (l.split(' ')[1] || '').replace(/\\040/g, ' ');
+      if (mp && (dir === mp || dir.startsWith(mp.endsWith('/') ? mp : mp + '/')) && mp.length > best.length) best = mp;
+    }
+    return { db_dir: dir, mount: best, persistent: best !== '/' };
+  } catch { return { db_dir: path.dirname(path.resolve(DB_FILE)), mount: null, persistent: null }; }
+};
+const hosted = !!(process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID || fs.existsSync('/.dockerenv'));
+const backupInfo = () => {
+  const l = listBackups(), dl = (one("SELECT v FROM kv WHERE k='bk_dl'") || {}).v || 0;
+  return { last_created: l.length ? l[0].created : 0, last_download: dl, remind_days: BACKUP_REMIND_DAYS, stale: !dl || now() - dl > BACKUP_REMIND_DAYS * 864e5 };
+};
+const lineInfo = () => ({ configured: !!(LINE_TOKEN && LINE_TO), used: (one('SELECT v FROM kv WHERE k=?', 'line:' + new Date().toISOString().slice(0, 7)) || {}).v || 0, max: LINE_MAX });
+route('GET', '/api/admin/system', A(u => { owner(u); return { storage: storageInfo(), hosted, backup: backupInfo(), line: lineInfo(), two_fa_required: REQUIRE_2FA }; }));
+route('POST', '/api/admin/line/test', A(async u => {
+  owner(u); if (!LINE_TOKEN || !LINE_TO) bad(400, 'ยังไม่ได้ตั้งค่า LINE_CHANNEL_TOKEN และ LINE_ADMIN_USER_ID');
+  let r;
+  try { r = await fetch(LINE_API + '/v2/bot/message/push', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + LINE_TOKEN }, body: JSON.stringify({ to: LINE_TO, messages: [{ type: 'text', text: '✅ ทดสอบแจ้งเตือนจาก Nongpoom Shop สำเร็จ' }] }) }); }
+  catch (e) { bad(502, 'เชื่อมต่อ LINE ไม่ได้: ' + e.message); }
+  if (!r.ok) { const t = await r.text().catch(() => ''); bad(502, `LINE ตอบกลับ ${r.status} ${t.slice(0, 160)}`.trim()); }
+  audit(u, 'line_test', null, null); return { ok: true };
 }));
 
 // ---- 2FA for admins ----
@@ -521,7 +532,7 @@ route('GET', '/api/admin/audit', A(() => q('SELECT * FROM audit ORDER BY id DESC
 route('GET', '/api/admin/ledger/(\\d+)', A((u, p) => q('SELECT * FROM ledger WHERE user_id=? ORDER BY id DESC LIMIT 200', p[1])));
 route('GET', '/api/admin/orders', A(() => q('SELECT o.no,o.price,o.discount,o.total,o.coupon,o.created,u.username,p.name product FROM orders o JOIN users u ON u.id=o.user_id JOIN products p ON p.id=o.product_id ORDER BY o.id DESC LIMIT 500')));
 route('GET', '/api/admin/topups/(\\d+)/slip', A((u, p) => ({ slip: (one('SELECT slip FROM topups WHERE id=?', p[1]) || {}).slip || null })));
-route('GET', '/api/admin/topups', A(() => q('SELECT t.id,t.ref,t.method,t.amount,t.status,t.created,(t.slip IS NOT NULL) has_slip,u.username FROM topups t JOIN users u ON u.id=t.user_id ORDER BY t.id DESC LIMIT 500')));
+route('GET', '/api/admin/topups', A(() => q('SELECT t.id,t.ref,t.method,t.amount,t.status,t.created,(t.slip IS NOT NULL) has_slip,(SELECT COUNT(*) FROM topups x WHERE x.user_id=t.user_id AND x.status=\'approved\') approved_n,(SELECT COUNT(*) FROM flags f WHERE f.user_id=t.user_id AND f.resolved=0) flags_n,u.username FROM topups t JOIN users u ON u.id=t.user_id ORDER BY t.id DESC LIMIT 500')));
 route('POST', '/api/admin/topups/(\\d+)/(approve|reject)', A((u, p) => { const t = decideTopup(+p[1], p[2] === 'approve'); audit(u, 'topup_' + t.status, one('SELECT id,username FROM users WHERE id=?', t.user_id), `${t.ref} ${t.amount} บาท`); return t; }));
 route('GET', '/api/admin/tickets', A(() => q('SELECT t.id,t.subject,t.body,t.reply,t.created,u.username FROM tickets t JOIN users u ON u.id=t.user_id ORDER BY t.id DESC LIMIT 500')));
 route('POST', '/api/admin/tickets/(\\d+)/reply', A((u, p, b) => { run('UPDATE tickets SET reply=? WHERE id=?', str(b.reply, 1, 1000, 'พิมพ์คำตอบ'), p[1]); return { ok: true }; }));
@@ -534,6 +545,8 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     const url = new URL(req.url, 'http://x'), sec = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin' };
     const send = (c, d) => { res.writeHead(c, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...sec }); res.end(JSON.stringify(d)); };
+    const fail = e => { if (e instanceof HttpErr) return send(e.c, { error: e.message, ...(e.x || {}) }); console.error(e); return send(500, { error: 'เกิดข้อผิดพลาดของระบบ' }); };
+    if (url.pathname === '/healthz') { try { one('SELECT 1 x'); return send(200, { ok: true }); } catch { return send(503, { ok: false }); } }
     if (url.pathname.startsWith('/api/')) {
       try {
         req.raw = Buffer.concat(chunks); let b = {};
@@ -542,13 +555,18 @@ const server = http.createServer((req, res) => {
           const p = re.exec(url.pathname); if (m !== req.method || !p) continue;
           const out = f(req, p, b, url);
           if (out && out.__raw) { res.writeHead(200, { 'Content-Type': out.type, 'Content-Disposition': `attachment; filename="${out.filename}"`, 'Cache-Control': 'no-store', ...sec }); return out.file ? fs.createReadStream(out.file).pipe(res) : res.end(out.body); }
+          if (out && typeof out.then === 'function') return out.then(o => send(200, o)).catch(fail);
           return send(200, out);
         }
         bad(404, 'ไม่พบ API');
-      } catch (e) { if (e instanceof HttpErr) return send(e.c, { error: e.message, ...(e.x || {}) }); console.error(e); return send(500, { error: 'เกิดข้อผิดพลาดของระบบ' }); }
+      } catch (e) { return fail(e); }
     }
     const f = path.join(PUB, path.normalize(url.pathname === '/' ? '/index.html' : url.pathname));
-    if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) { res.writeHead(404, sec); return res.end('Not found'); }
+    if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) {
+      const wantsHtml = String(req.headers.accept || '').includes('text/html'), pg = path.join(PUB, '404.html');
+      if (wantsHtml && fs.existsSync(pg)) { res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...sec }); return res.end(fs.readFileSync(pg)); }
+      res.writeHead(404, sec); return res.end('Not found');
+    }
     const ext = path.extname(f), type = TYPES[ext] || 'application/octet-stream';
     if (path.basename(f) === 'index.html' && f === path.join(PUB, 'index.html')) {
       // fill in the absolute site URL for link previews (Open Graph); PUBLIC_URL wins, else derived from the request host

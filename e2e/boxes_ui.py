@@ -5,7 +5,7 @@ for f in (DB,DB+'-wal',DB+'-shm'):
     try: os.remove(f)
     except FileNotFoundError: pass
 shutil.rmtree('/tmp/np-box-bk',ignore_errors=True)
-env={**os.environ,'PORT':str(PORT),'DB_FILE':DB,'APP_SECRET':'s','WEBHOOK_SECRET':'wh','ADMIN_USER':'boss','ADMIN_PASS':'bosspassword1','TRUST_PROXY':'1','BACKUP_DIR':'/tmp/np-box-bk'}
+env={**os.environ,'PORT':str(PORT),'DB_FILE':DB,'APP_SECRET':'s','WEBHOOK_SECRET':'wh','ADMIN_USER':'boss','ADMIN_PASS':'bosspassword1','TRUST_PROXY':'1','BACKUP_DIR':'/tmp/np-box-bk','ADMIN_2FA_REQUIRED':'0'}
 srv=subprocess.Popen(['node','--no-warnings','server.js'],cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); time.sleep(1.5)
 def api(m,p,b=None,t=None):
     h={'Content-Type':'application/json','X-Forwarded-For':'9.9.9.9'}
@@ -60,6 +60,30 @@ try:
         ap.fill('#bxn','กล่องใหม่'); ap.fill('#bxp','25'); ap.click('button:has-text("สร้างกล่อง")'); ap.wait_for_timeout(800)
         print('TOAST:',ap.locator('#toast').inner_text());ok('admin creates box from UI', api('GET','/api/admin/boxes',None,adm)[1].__len__()==2 and 'กล่องใหม่' in ap.locator('#view .card b').all_inner_texts())
         ap.screenshot(path='/tmp/box_admin.png',full_page=True)
+
+        # ---- slip review modal ----
+        for amt in (300,700):
+            api('POST','/api/topups',{'method':'kbank','amount':amt,'slip':'data:image/png;base64,'+base64.b64encode(png+str(amt).encode()).decode()},ut)
+        ap.click('button.nav:has-text("เติมเงิน")'); ap.wait_for_timeout(700)
+        ok('bulk review button shows pending count', '2 รายการ' in ap.locator('#toplist').inner_text())
+        ap.click('#toplist >> text=เริ่มตรวจสลิปต่อเนื่อง'); ap.wait_for_selector('#ov.show #rvsi img')
+        ok('review modal shows oldest first (฿300), 1/2', '1/2' in ap.locator('#mt').inner_text() and '฿300' in ap.locator('.rv .big').inner_text())
+        ok('approve is locked until the confirm box is ticked', ap.locator('#rvap').is_disabled())
+        ap.keyboard.press('ArrowRight'); ap.wait_for_timeout(200)
+        ok('arrow key goes to next slip (฿700, 2/2)', '2/2' in ap.locator('#mt').inner_text() and '฿700' in ap.locator('.rv .big').inner_text())
+        ap.keyboard.press('ArrowLeft'); ap.wait_for_timeout(200)
+        ap.check('#rvok'); ok('tick unlocks approve', not ap.locator('#rvap').is_disabled())
+        ap.click('#rvap'); ap.wait_for_function("document.querySelector('#mt').textContent.includes('2/2')&&document.querySelector('.rv .big').textContent.includes('700')")
+        ok('approving auto-advances to the next pending slip', True)
+        ap.once('dialog',lambda d:d.accept()); ap.click('#mf button.no'); ap.wait_for_timeout(900)
+        ok('after last slip the modal closes', not ap.locator('#ov.show').count())
+        tl=api('GET','/api/admin/topups',None,adm)[1]
+        ok('server: 300 approved, 700 rejected', sorted((t['amount'],t['status']) for t in tl)==[(300,'approved'),(700,'rejected')])
+        ap.click('button.nav:has-text("ความปลอดภัย")'); ap.wait_for_timeout(900)
+        ok('security tab shows system status + backup reminder', 'สถานะระบบ' in ap.locator('#view').inner_text() and 'ดาวน์โหลดไฟล์สำรองล่าสุด' in ap.locator('#view').inner_text())
+        ap.set_viewport_size({'width':390,'height':800}); ap.wait_for_timeout(300)
+        ap.click('#bnav button:last-child'); ap.wait_for_timeout(300)
+        ok('mobile: all menu items visible in the sheet without scrolling', ap.locator('#msheet .grid4 button').count()>=12)
         ok('no JS errors on admin', not aerr)
         br.close()
 finally:

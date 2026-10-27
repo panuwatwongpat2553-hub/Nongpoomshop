@@ -6,7 +6,7 @@ for f in (DB, DB + '-wal', DB + '-shm'):
     try: os.remove(f)
     except FileNotFoundError: pass
 shutil.rmtree('/tmp/np-e2e-bk', ignore_errors=True)
-env = {**os.environ, 'PORT': str(PORT), 'DB_FILE': DB, 'APP_SECRET': 'e2esecret', 'WEBHOOK_SECRET': 'wh',
+env = {**os.environ, 'PORT': str(PORT), 'DB_FILE': DB, 'APP_SECRET': 'e2esecret', 'ADMIN_2FA_REQUIRED': '0', 'WEBHOOK_SECRET': 'wh',
        'ADMIN_USER': 'boss', 'ADMIN_PASS': 'bosspassword1', 'TRUST_PROXY': '1', 'BACKUP_DIR': '/tmp/np-e2e-bk',
        'PAY_KBANK': 'ทดสอบ ระบบ|000-0-00000-0', 'PAY_TRUEMONEY': 'ทดสอบ ระบบ|000-000-0000'}
 srv = subprocess.Popen(['node', '--no-warnings', 'server.js'], cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))), env=env,
@@ -44,8 +44,6 @@ try:
     C = mk({'name': 'ไอดี C', 'price': 700, 'cost': 300, 'tags': ['x'], 'cred': 'userC / passC'})
     E = mk({'name': 'ไอดี E แพง', 'price': 2500, 'cost': 1000, 'tags': ['big'], 'cred': 'userE / passE'})
     api('POST', '/api/admin/coupons', {'code': 'TEN', 'type': 'p', 'val': 10, 'minspend': 0, 'remaining': 5}, adm)
-    rr = api('POST', '/api/register', {'username': 'referrer1', 'phone': '0899999999', 'password': 'password123'})[1]
-    refcode = api('GET', '/api/me/referral', None, rr['token'])[1]['code']
 
     with sync_playwright() as p:
         br = p.chromium.launch()
@@ -55,17 +53,14 @@ try:
         pg.on('pageerror', lambda e: errs.append('pageerror: ' + str(e)))
         pg.on('console', lambda m: errs.append('console: ' + m.text) if m.type == 'error' and 'Failed to load resource' not in m.text and 'ERR_FAILED' not in m.text else None)
 
-        # 1. referral link -> register with code prefilled
-        pg.goto(f'{BASE}/?ref={refcode}'); pg.wait_for_selector('#mReg.show')
-        ok('ref link opens register modal', True)
-        ok('ref code prefilled', pg.input_value('#rr') == refcode)
+        # 1. register (no referral field any more)
+        pg.goto(f'{BASE}/'); pg.evaluate("openReg()"); pg.wait_for_selector('#mReg.show')
+        ok('register form has no referral field', pg.locator('#rr').count() == 0)
         pg.fill('#ru', 'buyer1'); pg.fill('#rp', '0812345678'); pg.fill('#rw', 'password123'); pg.fill('#rc', 'password123')
         pg.click('#rb button.pri'); pg.wait_for_selector('#rb .note')
         pg.click('#rb button.pri'); pg.wait_for_function("!document.querySelector('#mReg').classList.contains('show')")
         tok = pg.evaluate("localStorage.getItem('np_token')")
         ok('registered with token', bool(tok))
-        ok('stored ref cleared after register', pg.evaluate("localStorage.getItem('np_ref')") is None)
-        ok('server linked referral', api('GET', '/api/me/referral', None, rr['token'])[1]['invited'] == 1)
         pg.wait_for_function("!document.querySelector('#belb').hidden")
         ok('bell visible, no tier chip', pg.is_visible('#belb') and pg.locator('#tierchip').count() == 0)
 
@@ -136,7 +131,7 @@ try:
         before = api('GET', '/api/me', None, tok)[1]['balance']
         pg.click('#cob'); pg.wait_for_selector('#mOrd.show'); pg.keyboard.press('Escape')
         after = api('GET', '/api/me', None, tok)[1]['balance']
-        ok('client total equals server charge (441)', before - after == 441)
+        ok('client total equals server charge (450)', before - after == 450)
 
         # 7. notifications
         api('POST', '/api/admin/products', {'name': 'ไอดี D ใหม่', 'price': 900, 'cost': 300, 'tags': ['Elite Pass'], 'cred': 'c'}, adm)
@@ -154,11 +149,9 @@ try:
         pg.keyboard.press('Escape')
 
         # 8. account modal
-        pg.evaluate("openPro()"); pg.wait_for_selector('#acx .rcode')
+        pg.evaluate("openPro()"); pg.wait_for_selector('#acx .sec')
         acx = pg.inner_text('#acx')
-        ok('account shows referral code, no tier', 'ระดับสมาชิก' not in acx and 'NP' in acx)
-        mycode = api('GET', '/api/me/referral', None, tok)[1]['code']
-        ok('referral link uses own code', mycode in acx)
+        ok('account has no referral section, no tier', 'ระดับสมาชิก' not in acx and 'ชวนเพื่อน' not in acx)
         ok('followed tag listed', 'elite pass' in acx)
         pg.screenshot(path='/tmp/np-e2e-account.png')
         pg.click('#acx .wtags .tagb'); pg.wait_for_timeout(600)

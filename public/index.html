@@ -156,7 +156,7 @@ footer{margin-top:20px;padding:36px 0 28px;background:var(--sf)}
 .ft-copy{grid-column:1/-1;padding-top:18px;border-top:1px solid var(--ln);font-size:12.5px}
 @media(max-width:760px){.ft{grid-template-columns:1fr}}
 
-/* ---- v15 storefront: sale price, accept box, referral, bell ---- */
+/* ---- v15 storefront: sale price, accept box, bell ---- */
 [hidden]{display:none!important}
 .brand{color:inherit;text-decoration:none}
 .row{gap:8px;flex-wrap:wrap}
@@ -365,7 +365,7 @@ document.getElementById('yr').textContent=new Date().getFullYear();
 let P=[];
 const cats=()=>["ทั้งหมด",...new Set(P.map(x=>x.c))];
 let orders=[],cat="ทั้งหมด",bal=0,user=null,cart=[],meth="tm",amt=100;
-var UN=0,ACC=false,WT=[],RF=null,NPREF="",CURD=null;
+var UN=0,ACC=false,WT=[],CURD=null;
 const $=i=>document.getElementById(i),f=n=>"฿"+n.toLocaleString("th-TH");
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),2600)}
 let F=new Set(),pg=1,LINE="https://line.me/ti/p/BpqNajqSxu";const PS=12;
@@ -471,7 +471,7 @@ function revHome(){const bp=user?[...new Map(orders.flatMap(o=>o.items).map(i=>[
 let RU={};
 function openReg(){closeM();regS(1);openM("mReg")}
 function regS(n){$("rs").innerHTML=["กรอกข้อมูล","เสร็จสิ้น"].map((t,i)=>`<span class="${i+1<=n?"on":""}">${i+1}. ${t}</span>`).join("");
- $("rb").innerHTML=n==1?`<label class="field">ชื่อผู้ใช้<input id="ru" autocomplete="username"></label><label class="field">เบอร์โทรศัพท์<input id="rp" inputmode="numeric" maxlength="10"></label><label class="field">รหัสผ่าน (8 ตัวขึ้นไป)<input id="rw" type="password"></label><label class="field">ยืนยันรหัสผ่าน<input id="rc" type="password"></label><label class="field">รหัสแนะนำเพื่อน (ถ้ามี)<input id="rr" maxlength="12" autocapitalize="characters" value="${E(NPREF||'')}"></label><button class="btn pri" style="width:100%" onclick="regNext()">สมัครสมาชิก</button>`:`<div class="note">สมัครสมาชิกสำเร็จ ยินดีต้อนรับ ${RU.u}</div><button class="btn pri" style="width:100%" onclick="regDone()">เริ่มช้อป</button>`}
+ $("rb").innerHTML=n==1?`<label class="field">ชื่อผู้ใช้<input id="ru" autocomplete="username"></label><label class="field">เบอร์โทรศัพท์<input id="rp" inputmode="numeric" maxlength="10"></label><label class="field">รหัสผ่าน (8 ตัวขึ้นไป)<input id="rw" type="password"></label><label class="field">ยืนยันรหัสผ่าน<input id="rc" type="password"></label><button class="btn pri" style="width:100%" onclick="regNext()">สมัครสมาชิก</button>`:`<div class="note">สมัครสมาชิกสำเร็จ ยินดีต้อนรับ ${RU.u}</div><button class="btn pri" style="width:100%" onclick="regDone()">เริ่มช้อป</button>`}
 async function regNext(){const u=$('ru').value.trim(),phone=$('rp').value.trim(),pw=$('rw').value;if(u.length<3)return toast('ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร');if(!/^0\d{9}$/.test(phone))return toast('เบอร์โทรไม่ถูกต้อง');if(pw.length<8)return toast('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');if(pw!==$('rc').value)return toast('รหัสผ่านไม่ตรงกัน');try{const d=await npReq('/api/register','POST',{username:u,phone,password:pw});RU={u:E(u),token:d.token};npSetSession(d);regS(2)}catch(e){toast(e.message)}}
 function regDone(){user=RU.u;closeM();ui();toast("เข้าสู่ระบบแล้ว")}
 const _oo=openOrders;openOrders=function(){_oo();$("olist").insertAdjacentHTML("beforeend",`<h3 style="margin-top:12px">ประวัติเติมเงิน</h3>`+(TU.length?TU.map(t=>`<div class="it"><span>${t.m} · ${f(t.a)}<br><small style="color:var(--t2)">${t.at}</small></span><span>${t.st}</span></div>`).join(""):`<div class="empty">ยังไม่มีรายการเติมเงิน</div>`))};
@@ -516,8 +516,8 @@ let npToken = localStorage.getItem('np_token') || '', npCurrentTopup = null;
 async function npReq(path, method='GET', body=null){
   const headers={}; if(npToken) headers.Authorization='Bearer '+npToken;
   if(body!==null) headers['Content-Type']='application/json';
-  const r=await fetch(NP_API+path,{method,headers,body:body===null?undefined:JSON.stringify(body)});
-  const d=await r.json().catch(()=>({error:'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง'}));
+  let r;try{r=await fetch(NP_API+path,{method,headers,body:body===null?undefined:JSON.stringify(body)})}catch(e){throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่อีกครั้ง')}
+  const d=await r.json().catch(()=>({error:'ระบบไม่พร้อมใช้งานชั่วคราว (อาจกำลังอัปเดต) กรุณารอสักครู่แล้วลองใหม่'}));
   if(!r.ok) throw new Error(d.error||'ทำรายการไม่สำเร็จ'); return d;
 }
 function npSetSession(d){npToken=d.token;localStorage.setItem('np_token',npToken);user=d.user?.username||d.username||user;bal=Number(d.user?.balance??d.balance??0);ui();}
@@ -563,7 +563,7 @@ async function npLoadProducts(){
 async function npLoadReviews(){
   try{RV=(await npReq('/api/reviews')).map(r=>({s:r.stars,t:npEsc(r.body),u:npEsc(r.user),c:r.code,at:new Date(r.created).toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok'})}));revHome()}catch(e){}
 }
-const npLogout=()=>{npToken='';localStorage.removeItem('np_token');user=null;bal=0;cart=[];orders=[];TU=[];CU=null;F.clear();WT=[];RF=null;UN=0;ACC=false;document.documentElement.classList.remove('adm');ui();drawer(0);render()};
+const npLogout=()=>{npToken='';localStorage.removeItem('np_token');user=null;bal=0;cart=[];orders=[];TU=[];CU=null;F.clear();WT=[];UN=0;ACC=false;document.documentElement.classList.remove('adm');ui();drawer(0);render()};
 
 npRefresh=async function(){
   if(!npToken)return;
@@ -654,7 +654,7 @@ async function npLoadStats(){
   try{const l=await npReq('/api/recent-sales');$('rss').hidden=!l.length;$('rsl').innerHTML=l.map(r=>`<div><span><b>${npEsc(r.user)}</b> ซื้อ ${npEsc(r.name)} <small>รหัส ${npEsc(r.code)}</small></span><small>${npAgo(r.created)}</small></div>`).join('')}catch(e){}
 }
 
-// ---- v15: storefront features backed by the server (sale price, accept box, favourites, tag watch, bell, referral) ----
+// ---- v15: storefront features backed by the server (sale price, accept box, favourites, tag watch, bell) ----
 function untilT(t){return new Date(t).toLocaleString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+' น.'}
 function priceH(x){return x.op?`<span class="price sale">${f(x.p)}<s class="old">${f(x.op)}</s><span class="pct">-${Math.round((1-x.p/x.op)*100)}%</span></span>`:`<span class="price">${f(x.p)}</span>`}
 function accH(){return `<label class="acc"><input type="checkbox" ${ACC?'checked':''} onchange="setAcc(this.checked)"><span>ฉันรับทราบและยอมรับว่า <b>สินค้าทุกชิ้นไม่รับประกัน และไม่รับคืนทุกกรณี</b> (<a href="#" onclick="event.preventDefault();openPol('r')">นโยบายคืนเงิน</a>)</span></label>`}
@@ -715,27 +715,21 @@ function notGo(id){closeM();if(P.some(p=>p.id==id))showP(id);else toast('ไอ�
 async function npPoll(){if(!npToken||!user)return;try{const d=await npReq('/api/me');UN=d.unread||0;ui()}catch(e){}}
 setInterval(()=>{if(!document.hidden)npPoll()},60000);
 
-// account: referral link, followed tags
-{const o=openPro;openPro=async function(){o();paintAcx();try{RF=await npReq('/api/me/referral');paintAcx()}catch(e){}}}
+// account: followed tags
+{const o=openPro;openPro=function(){o();paintAcx()}}
 function paintAcx(){
   const box=$('acx');if(!box)return;let h='';
-  if(RF){const link=location.origin+'/?ref='+RF.code;
-    h+=`<div class="sec"><h4>ชวนเพื่อน รับ ${f(RF.bonus)}</h4><div class="rcode">${npEsc(RF.code)}</div><p style="word-break:break-all;margin:4px 0 8px">${npEsc(link)}</p><button class="btn ghost" onclick="copyRef()">คัดลอกลิงก์ชวนเพื่อน</button><p style="margin-top:8px">เมื่อเพื่อนสมัครด้วยลิงก์นี้และเติมเงินครั้งแรกอย่างน้อย ${f(RF.min_topup)} คุณได้รับ ${f(RF.bonus)}${RF.bonus_new?` และเพื่อนได้ ${f(RF.bonus_new)}`:''} (รับได้สูงสุด ${RF.max_rewards} ครั้ง)</p><p>ชวนแล้ว ${RF.invited} คน · ได้โบนัสแล้ว ${RF.rewarded} ครั้ง · รวม ${f(RF.earned)}</p></div>`}
   const tags=WT.filter(t=>t!=='*');
   h+=`<div class="sec"><h4>แท็กที่ติดตาม</h4><label class="acc" style="margin:0 0 8px"><input type="checkbox" ${WT.includes('*')?'checked':''} onchange="wtog('*')"><span>แจ้งเตือนทุกครั้งที่มีไอดีใหม่</span></label><div class="wtags">${tags.length?tags.map(t=>`<button class="tagb on" data-t="${npEsc(t)}" onclick="wtog(this.dataset.t)" title="เลิกติดตาม">${npEsc(t)} ✕</button>`).join(''):'<p>ยังไม่ได้ติดตามแท็กใด</p>'}</div><div class="tools" style="margin:0"><input id="wti" maxlength="40" placeholder="เช่น Elite Pass, แรงค์ Grandmaster" aria-label="แท็กที่ต้องการติดตาม" onkeydown="if(event.key==='Enter')wadd()"><button class="btn ghost" onclick="wadd()">ติดตาม</button></div></div>`;
   box.innerHTML=h;
 }
-function copyRef(){const t=location.origin+'/?ref='+(RF&&RF.code||'');(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('คัดลอกลิงก์แล้ว'),()=>toast('คัดลอกไม่ได้ กดค้างที่ลิงก์เพื่อคัดลอกเอง'))}
 
-// referral: ?ref=CODE from a friend's link pre-fills registration
-try{const r=new URLSearchParams(location.search).get('ref');if(r&&/^[A-Za-z0-9]{4,12}$/.test(r)){NPREF=r.toUpperCase();localStorage.setItem('np_ref',NPREF)}else NPREF=localStorage.getItem('np_ref')||''}catch(e){}
 regNext=async function(){
-  const u=$('ru').value.trim(),phone=$('rp').value.trim(),pw=$('rw').value,ref=($('rr')?$('rr').value.trim():'');
+  const u=$('ru').value.trim(),phone=$('rp').value.trim(),pw=$('rw').value;
   if(u.length<3)return toast('ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร');if(!/^0\d{9}$/.test(phone))return toast('เบอร์โทรไม่ถูกต้อง');if(pw.length<8)return toast('รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร');if(pw!==$('rc').value)return toast('รหัสผ่านไม่ตรงกัน');
-  const b={username:u,phone,password:pw};if(ref)b.ref=ref;
-  try{const d=await npReq('/api/register','POST',b);RU={u:E(u),token:d.token};npSetSession(d);NPREF='';try{localStorage.removeItem('np_ref')}catch(e){}regS(2)}catch(e){toast(e.message)}
+  const b={username:u,phone,password:pw};
+  try{const d=await npReq('/api/register','POST',b);RU={u:E(u),token:d.token};npSetSession(d);regS(2)}catch(e){toast(e.message)}
 };
-if(NPREF&&!npToken)openReg();
 
 // ---- v16: hamburger menu (mobile) ----
 function menu(o){
